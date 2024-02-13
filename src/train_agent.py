@@ -117,6 +117,9 @@ parser.add_argument("--pretrained-gnn", action="store_true", default=False, help
 parser.add_argument("--dumb-ac", action="store_true", default=False,help="Use a single-layer actor-critic")
 parser.add_argument("--freeze-ltl", action="store_true", default=False,help="Freeze the gradient updates of the LTL module")
 
+# DFA
+parser.add_argument("--dfa", action="store_true", default=False, help="Use DFA instead of LTL (default: False)")
+
 args = parser.parse_args()
 
 use_mem = args.recurrence > 1
