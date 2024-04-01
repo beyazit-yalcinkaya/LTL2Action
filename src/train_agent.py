@@ -140,7 +140,7 @@ if args.freeze_ltl:
 if use_mem:
     gnn_name = gnn_name + "-recurrence:%d"%(args.recurrence)
 
-default_model_name = f"{gnn_name}_{args.ltl_sampler}_{args.env}_seed:{args.seed}_epochs:{args.epochs}_bs:{args.batch_size}_fpp:{args.frames_per_proc}_dsc:{args.discount}_lr:{args.lr}_ent:{args.entropy_coef}_clip:{args.clip_eps}_prog:{args.progression_mode}"
+default_model_name = f"{gnn_name}_{args.ltl_sampler}_{args.env}_seed:{args.seed}_epochs:{args.epochs}_bs:{args.batch_size}_fpp:{args.frames_per_proc}_dsc:{args.discount}_lr:{args.lr}_ent:{args.entropy_coef}_clip:{args.clip_eps}_prog:{args.progression_mode}_dfa:{args.dfa}"
 
 model_name = args.model or default_model_name
 storage_dir = "storage" if args.checkpoint_dir is None else args.checkpoint_dir
@@ -185,7 +185,7 @@ txt_logger.info(f"Device: {device}\n")
 envs = []
 progression_mode = args.progression_mode
 for i in range(args.procs):
-    envs.append(utils.make_env(args.env, progression_mode, args.ltl_sampler, args.seed, args.int_reward, args.noLTL))
+    envs.append(utils.make_env(args.env, progression_mode, args.ltl_sampler, args.seed, args.int_reward, args.noLTL, args.dfa))
 
 # Sync environments
 envs[0].reset()
