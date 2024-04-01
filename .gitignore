@@ -4,3 +4,6 @@ src/storage/
 spot-2.9/
 
 **/__pycache__
+
+.DS_Store
+
