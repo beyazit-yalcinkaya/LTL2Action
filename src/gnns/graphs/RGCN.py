@@ -8,11 +8,13 @@ from dgl.nn.pytorch.conv import RelGraphConv
 
 from gnns.graphs.GNN import GNN
 
-from utils.ast_builder import edge_types
+
 
 class RGCN(GNN):
     def __init__(self, input_dim, output_dim, **kwargs):
         super().__init__(input_dim, output_dim)
+
+        from utils.env import edge_types
 
         hidden_dims = kwargs.get('hidden_dims', [32])
         self.num_layers = len(hidden_dims)
@@ -66,6 +68,9 @@ class RGCNRoot(RGCN):
 class RGCNRootShared(GNN):
     def __init__(self, input_dim, output_dim, **kwargs):
         super().__init__(input_dim, output_dim)
+
+        from utils.env import edge_types
+
         hidden_dim = kwargs.get('hidden_dim', 32)
         num_layers = kwargs.get('num_layers', 2)
 

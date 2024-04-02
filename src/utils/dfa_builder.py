@@ -6,9 +6,7 @@ from dfa import dfa2dict
 from copy import deepcopy
 from pysat.solvers import Solver
 
-edge_types = {k:v for (v, k) in enumerate(["self", "arg", "arg1", "arg2"])}
-
-FEATURE_SIZE = 22
+FEATURE_SIZE = 22 # TODO: Fix this
 
 """
 A class that can take an DFA formula and generate the Abstract Syntax Tree (DFA) of it. This
@@ -121,6 +119,7 @@ class DFABuilder(object):
 
 
     def _format(self, init_node, accepting_states, nxg):
+        from utils.env import edge_types
         # print('init', init_node)
         # print('accepting', accepting_states)
         rejecting_states = []
@@ -156,14 +155,14 @@ class DFABuilder(object):
             new_node_name = new_node_name_base_str + str(new_node_name_counter)
             new_node_name_counter += 1
             nxg.add_node(new_node_name, feat=np.array(onehot_embedding))
-            nxg.add_edge(e[0], new_node_name, type=2)
-            nxg.add_edge(new_node_name, e[1], type=3)
+            nxg.add_edge(e[0], new_node_name, type=edge_types["normal-to-temp"])
+            nxg.add_edge(new_node_name, e[1], type=edge_types["temp-to-normal"])
 
         nx.set_node_attributes(nxg, 0.0, "is_root")
         nxg.nodes[init_node]["is_root"] = 1.0 # is_root means current state
 
         for node in nxg.nodes:
-            nxg.add_edge(node, node, type=1)
+            nxg.add_edge(node, node, type=edge_types["self"])
 
         return nxg
 

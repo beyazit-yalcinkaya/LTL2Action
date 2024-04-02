@@ -5,7 +5,7 @@ import dgl
 import networkx as nx
 from sklearn.preprocessing import OneHotEncoder
 
-edge_types = {k:v for (v, k) in enumerate(["self", "arg", "arg1", "arg2"])}
+# edge_types = {k:v for (v, k) in enumerate(["self", "arg", "arg1", "arg2"])}
 
 """
 A class that can take an LTL formula and generate the Abstract Syntax Tree (AST) of it. This
@@ -48,6 +48,7 @@ class ASTBuilder(object):
 
 
     def _get_edge_type(self, operator, parameter_num=None):
+        from utils.env import edge_types
         operator = operator.lower()
         if (operator in ["next", "until", "and", "or"]):
             # Uncomment to make "and" and "or" permutation invariant
