@@ -41,7 +41,7 @@ def get_obss_preprocessor(env, gnn, progression_mode):
                 def preprocess_obss(obss, device=None):
                     return torch_ac.DictList({
                         "image": preprocess_images([obs["features"] for obs in obss], device=device),
-                        "text":  preprocess_texts([obs["text"] for obs in obss], vocab, vocab_space, gnn=gnn, device=device, ast=tree_builder)
+                        "text":  preprocess_texts([obs["text"] for obs in obss], vocab, vocab_space, gnn=gnn, device=device, graph_builder=tree_builder)
                     })
 
             preprocess_obss.vocab = vocab
@@ -62,7 +62,7 @@ def get_obss_preprocessor(env, gnn, progression_mode):
 
                 def preprocess_obss(obss, device=None):
                     return torch_ac.DictList({
-                        "text":  preprocess_texts([obs["text"] for obs in obss], vocab, vocab_space, gnn=gnn, device=device, ast=tree_builder)
+                        "text":  preprocess_texts([obs["text"] for obs in obss], vocab, vocab_space, gnn=gnn, device=device, graph_builder=tree_builder)
                     })
 
             preprocess_obss.vocab = vocab
@@ -89,7 +89,7 @@ def get_obss_preprocessor(env, gnn, progression_mode):
                 def preprocess_obss(obss, device=None):
                     return torch_ac.DictList({
                         "image": preprocess_images([obs["features"] for obs in obss], device=device),
-                        "text":  preprocess_texts([obs["text"] for obs in obss], vocab, vocab_space, gnn=gnn, device=device, ast=tree_builder)
+                        "text":  preprocess_texts([obs["text"] for obs in obss], vocab, vocab_space, gnn=gnn, device=device, graph_builder=tree_builder)
                     })
 
             preprocess_obss.vocab = vocab
@@ -110,7 +110,7 @@ def get_obss_preprocessor(env, gnn, progression_mode):
 
                 def preprocess_obss(obss, device=None):
                     return torch_ac.DictList({
-                        "text":  preprocess_texts([obs["text"] for obs in obss], vocab, vocab_space, gnn=gnn, device=device, ast=tree_builder)
+                        "text":  preprocess_texts([obs["text"] for obs in obss], vocab, vocab_space, gnn=gnn, device=device, graph_builder=tree_builder)
                     })
 
             preprocess_obss.vocab = vocab
@@ -139,7 +139,7 @@ def preprocess_images(images, device=None):
 
 def preprocess_texts(texts, vocab, vocab_space, gnn=False, device=None, **kwargs):
     if (gnn):
-        return preprocess4gnn(texts, kwargs["ast"], device)
+        return preprocess4gnn(texts, kwargs["graph_builder"], device)
 
     return preprocess4rnn(texts, vocab, device)
 
@@ -165,11 +165,11 @@ def preprocess4rnn(texts, vocab, device=None):
 
     return torch.tensor(indexed_texts, device=device, dtype=torch.long)
 
-def preprocess4gnn(texts, ast, device=None):
+def preprocess4gnn(texts, graph_builder, device=None):
     """
     This function receives the LTL formulas and convert them into inputs for a GNN
     """
-    return np.array([[ast(text).to(device)] for text in texts])
+    return np.array([[graph_builder(text).to(device)] for text in texts])
 
 
 class Vocabulary:

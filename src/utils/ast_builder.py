@@ -92,7 +92,7 @@ class ASTBuilder(object):
             return nxg
 
         if formula in ["True", "False"]:
-            nxg.add_node(shift, feat=self.vocab._one_hot(formula), token=formula)
+            nxg.add_node(shift, feat=self._one_hot(formula), token=formula)
             nxg.add_edge(shift, shift, type=self._get_edge_type("self"))
 
             return nxg

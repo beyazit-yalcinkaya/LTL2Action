@@ -7,6 +7,7 @@ given template(s).
 """
 
 import random
+from dfa import DFA
 
 class DFASampler():
     def __init__(self, propositions):
@@ -161,9 +162,31 @@ class AdversarialEnvSampler(DFASampler):
     def sample(self):
         p = random.randint(0,1)
         if p == 0:
-            return ('eventually', ('and', 'a', ('eventually', 'b')))
+            def delta(s, c):
+                if s == 0 and c == 'a':
+                    return 1
+                elif s == 1 and c == 'b':
+                    return 2
+                return s
+            return DFA(
+                start=0,
+                inputs=self.propositions,
+                label=lambda s: s == 2,
+                transition=delta,
+            )
         else:
-            return ('eventually', ('and', 'a', ('eventually', 'c')))
+            def delta(s, c):
+                if s == 0 and c == 'a':
+                    return 1
+                elif s == 1 and c == 'c':
+                    return 2
+                return s
+            return DFA(
+                start=0,
+                inputs=self.propositions,
+                label=lambda s: s == 2,
+                transition=delta,
+            )
 
 def getRegisteredSamplers(propositions):
     return [SequenceSampler(propositions),

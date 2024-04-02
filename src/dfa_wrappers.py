@@ -39,12 +39,11 @@ class DFAEnv(gym.Wrapper):
             - "none": the agent gets the full, original DFA formula as part of the observation
         """
         super().__init__(env)
-        self.progression_mode   = progression_mode
+        self.progression_mode = progression_mode
         self.propositions = self.env.get_propositions()
         self.sampler = getDFASampler(dfa_sampler, self.propositions)
 
         self.observation_space = spaces.Dict({'features': env.observation_space})
-        self.known_progressions = {}
         self.intrinsic = intrinsic
 
 
@@ -65,7 +64,6 @@ class DFAEnv(gym.Wrapper):
         raise NotImplementedError
 
     def reset(self):
-        self.known_progressions = {}
         self.obs = self.env.reset()
 
         # Defining an DFA goal
@@ -79,28 +77,17 @@ class DFAEnv(gym.Wrapper):
             dfa_obs = {'features': self.obs,'text': self.dfa_goal}
         return dfa_obs
 
-
     def step(self, action):
-        int_reward = 0
         # executing the action in the environment
         next_obs, original_reward, env_done, info = self.env.step(action)
 
         # progressing the DFA formula
         truth_assignment = self.get_events(self.obs, action, next_obs)
+
         self.dfa_goal = self.progression(self.dfa_goal, truth_assignment)
         self.obs      = next_obs
 
-        # Computing the DFA reward and done signal
-        dfa_reward = 0.0
-        dfa_done   = False
-        if self.dfa_goal == 'True':
-            dfa_reward = 1.0
-            dfa_done   = True
-        elif self.dfa_goal == 'False':
-            dfa_reward = -1.0
-            dfa_done   = True
-        else:
-            dfa_reward = int_reward
+        dfa_reward, dfa_done = self.get_dfa_reward_and_dfa_done(self.dfa_goal)
 
         # Computing the new observation and returning the outcome of this action
         if self.progression_mode == "full":
@@ -116,44 +103,41 @@ class DFAEnv(gym.Wrapper):
         done    = env_done or dfa_done
         return dfa_obs, reward, done, info
 
-    def progression(self, dfa_formula, truth_assignment):
+    def get_dfa_reward_and_dfa_done(self, dfa):
+        start_state = dfa.start
+        start_state_label = dfa._label(start_state)
+        states = dfa.states()
 
-        if (dfa_formula, truth_assignment) not in self.known_progressions:
-            result_dfa = dfa_progression.progress_and_clean(dfa_formula, truth_assignment)
-            self.known_progressions[(dfa_formula, truth_assignment)] = result_dfa
+        if start_state_label == True: # If starting state of self.dfa_goal is accepting, then dfa_reward is 1.0.
+            dfa_reward = 1.0
+            dfa_done = True
+        elif len(states) == 1: # If starting state of self.dfa_goal is rejecting and self.dfa_goal has a single state, then dfa_reward is reject_reward.
+            dfa_reward = -1 # Or maybe 0.0
+            dfa_done = True
+        else:
+            dfa_reward = 0.0 # If starting state of self.dfa_goal is rejecting and self.dfa_goal has a multiple states, then dfa_reward is 0.0.
+            dfa_done = False
 
-        return self.known_progressions[(dfa_formula, truth_assignment)]
+        return dfa_reward, dfa_done
+
+    def progression(self, dfa, truth_assignment, start=None):
+        import attr
+        return attr.evolve(dfa, start=dfa.transition(truth_assignment, start=start))
 
 
     # # X is a vector where index i is 1 if prop i progresses the formula, -1 if it falsifies it, 0 otherwise.
-    def progress_info(self, dfa_formula):
+    def progress_info(self, dfa):
         propositions = self.env.get_propositions()
         X = np.zeros(len(self.propositions))
 
         for i in range(len(propositions)):
-            progress_i = self.progression(dfa_formula, propositions[i])
-            if progress_i == 'False':
-                X[i] = -1.
-            elif progress_i != dfa_formula:
-                X[i] = 1.
+            progress_i = self.progression(dfa, propositions[i])
+            dfa_reward, _ = self.get_dfa_reward_and_dfa_done(progress_i)
+            X[i] = dfa_reward
         return X
 
     def sample_dfa_goal(self):
-        # NOTE: The propositions must be represented by a char
-        # This function must return an DFA formula for the task
-        formula = self.sampler.sample()
-
-        if isinstance(self.sampler, SequenceSampler):
-            def flatten(bla):
-                output = []
-                for item in bla:
-                    output += flatten(item) if isinstance(item, tuple) else [item]
-                return output
-
-            length = flatten(formula).count("and") + 1
-            self.env.timeout = 25 # 10 * length
-
-        return formula
+        return self.sampler.sample()
 
 
     def get_events(self, obs, act, next_obs):
