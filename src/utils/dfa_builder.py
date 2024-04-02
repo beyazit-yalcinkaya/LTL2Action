@@ -102,7 +102,6 @@ class DFABuilder(object):
 
         accepting_states = []
         for start, (accepting, transitions) in dfa_dict.items():
-            # pydot_graph.add_node(nodes[start])
             start = str(start)
             nxg.add_node(start)
             if accepting:
@@ -111,7 +110,6 @@ class DFABuilder(object):
                 if nxg.has_edge(start, str(end)):
                     existing_label = nxg.get_edge_data(start, str(end))['label']
                     nxg.add_edge(start, str(end), label='{} | {}'.format(existing_label, action))
-                    # print('{} | {}'.format(existing_label, action))
                 else:
                     nxg.add_edge(start, str(end), label=action)
 
@@ -120,8 +118,6 @@ class DFABuilder(object):
 
     def _format(self, init_node, accepting_states, nxg):
         from utils.env import edge_types
-        # print('init', init_node)
-        # print('accepting', accepting_states)
         rejecting_states = []
         for node in nxg.nodes:
             if self._is_sink_state(node, nxg) and node not in accepting_states:
@@ -143,9 +139,7 @@ class DFABuilder(object):
         new_node_name_counter = 0
 
         for e in edges:
-            # print(e, nxg.edges[e])
             guard = nxg.edges[e]["label"]
-            # print(e, guard)
             nxg.remove_edge(*e)
             if e[0] == e[1]:
                 continue # We define self loops below
@@ -168,7 +162,7 @@ class DFABuilder(object):
 
     def get_nxg_from_dfa(self, dfa):
         init_node, accepting_states, nxg = self.dfa2nxg(dfa)
-        dfa_nxg = self._format(init_node,accepting_states,nxg)
+        dfa_nxg = self._format(init_node, accepting_states, nxg)
         return dfa_nxg
 
 
