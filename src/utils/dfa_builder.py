@@ -22,6 +22,8 @@ class DFABuilder(object):
     def __call__(self, dfa, library="dgl"):
         nxg = self.get_nxg_from_dfa(dfa)
 
+        nxg = nxg.reverse(copy=True)
+
         if (library == "networkx"): return nxg
 
         # convert the Networkx graph to dgl graph and pass the 'feat' attribute
@@ -175,7 +177,8 @@ def draw(G, formula):
 
     plt.title(formula)
     pos=graphviz_layout(G, prog='dot')
-    labels = nx.get_node_attributes(G,'token')
+    # labels = nx.get_node_attributes(G,'token')
+    labels = G.nodes
     nx.draw(G, pos, with_labels=True, arrows=True, labels=labels, node_shape='s', edgelist=list(nx.get_edge_attributes(G,'type')), node_size=500, node_color="white") #edge_color=edge_color
     plt.show()
 

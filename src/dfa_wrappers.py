@@ -18,7 +18,7 @@ Notes about DFAEnv:
 import numpy as np
 import gym
 from gym import spaces
-import dfa_progression, random
+import random
 from dfa_samplers import getDFASampler, SequenceSampler
 
 class DFAEnv(gym.Wrapper):
@@ -122,7 +122,8 @@ class DFAEnv(gym.Wrapper):
 
     def progression(self, dfa, truth_assignment, start=None):
         import attr
-        return attr.evolve(dfa, start=dfa.transition(truth_assignment, start=start))
+        dfa = attr.evolve(dfa, start=dfa.transition(truth_assignment, start=start))
+        return dfa
 
 
     # # X is a vector where index i is 1 if prop i progresses the formula, -1 if it falsifies it, 0 otherwise.
