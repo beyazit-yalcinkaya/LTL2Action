@@ -119,15 +119,18 @@ class EventuallySampler(DFASampler):
 
     def sample(self):
         conjs = random.randint(*self.conjunctions)
-        ltl = None
-
-        for i in range(conjs):
-            task = self.sample_sequence()
-            if ltl is None:
-                ltl = task
-            else:
-                ltl = ('and',task,ltl)
-        return ltl
+        seqs = tuple(self.sample_sequence() for _ in range(conjs))
+        def delta(s, c):
+            for i in range(len(s)):
+                if s[i] != () and c in s[i][0]:
+                    return s[:i] + (s[i][1:],) + s[i + 1:]
+            return s
+        return DFA(
+            start=seqs,
+            inputs=self.propositions,
+            label=lambda s: s == ["", ""],
+            transition=delta,
+        )
 
 
     def sample_sequence(self):
@@ -144,18 +147,10 @@ class EventuallySampler(DFASampler):
             else:
                 c = random.sample(population, 1)
 
-            seq.append(c)
+            seq.append(tuple(c))
             last = c
 
-        ret = self._get_sequence(seq)
-
-        return ret
-
-    def _get_sequence(self, seq):
-        term = seq[0][0] if len(seq[0]) == 1 else ('or', seq[0][0], seq[0][1])
-        if len(seq) == 1:
-            return ('eventually',term)
-        return ('eventually',('and', term, self._get_sequence(seq[1:])))
+        return tuple(seq)
 
 
 class AdversarialEnvSampler(DFASampler):
