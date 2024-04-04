@@ -84,6 +84,7 @@ class BaseAlgo(ABC):
 
         self.obs = self.env.reset()
         self.obss = [None]*(shape[0])
+        self.preprocessed_obss = [None]*(shape[0])
         if self.acmodel.recurrent:
             self.memory = torch.zeros(shape[1], self.acmodel.memory_size, device=self.device)
             self.memories = torch.zeros(*shape, self.acmodel.memory_size, device=self.device)
@@ -126,11 +127,11 @@ class BaseAlgo(ABC):
             Useful stats about the training process, including the average
             reward, policy loss, value loss, etc.
         """
-
         for i in range(self.num_frames_per_proc):
             # Do one agent-environment interaction
 
             preprocessed_obs = self.preprocess_obss(self.obs, device=self.device)
+            self.preprocessed_obss[i] = preprocessed_obs
             with torch.no_grad():
                 if self.acmodel.recurrent:
                     dist, value, memory = self.acmodel(preprocessed_obs, self.memory * self.mask.unsqueeze(1))
@@ -180,6 +181,7 @@ class BaseAlgo(ABC):
         # Add advantage and return to experiences
 
         preprocessed_obs = self.preprocess_obss(self.obs, device=self.device)
+        self.preprocessed_obss[-1] = preprocessed_obs
         with torch.no_grad():
             if self.acmodel.recurrent:
                 _, next_value, _ = self.acmodel(preprocessed_obs, self.memory * self.mask.unsqueeze(1))
@@ -206,6 +208,14 @@ class BaseAlgo(ABC):
         exps.obs = [self.obss[i][j]
                     for j in range(self.num_procs)
                     for i in range(self.num_frames_per_proc)]
+        # preprocessed_obss_flattened = [self.preprocessed_obss[i][j]
+        #                                for j in range(self.num_procs)
+        #                                for i in range(self.num_frames_per_proc)]
+        # exps.obs = DictList({
+        #     "image": torch.stack([i.image for i in preprocessed_obss_flattened]),
+        #     "text" : np.array([i.text for i in preprocessed_obss_flattened])
+        #     })
+
         if self.acmodel.recurrent:
             # T x P x D -> P x T x D -> (P * T) x D
             exps.memory = self.memories.transpose(0, 1).reshape(-1, *self.memories.shape[2:])

@@ -128,7 +128,7 @@ class EventuallySampler(DFASampler):
         return DFA(
             start=seqs,
             inputs=self.propositions,
-            label=lambda s: s == ["", ""],
+            label=lambda s: s == tuple(tuple() for _ in range(conjs)),
             transition=delta,
         )
 

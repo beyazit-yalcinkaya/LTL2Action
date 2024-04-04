@@ -1,3 +1,4 @@
+import ring
 import numpy as np
 
 import dgl
@@ -19,8 +20,20 @@ class DFABuilder(object):
 
         self.propositions = propositions
 
+    # To make the caching work.
+    def __ring_key__(self):
+        return "DFABuilder"
+
     def __call__(self, dfa, library="dgl"):
-        nxg = self.get_nxg_from_dfa(dfa)
+        dfa_dict, init_state = dfa2dict(dfa)
+        return self._to_graph(dfa_dict, init_state, library)
+
+    @ring.lru(maxsize=1000000)
+    def _to_graph(self, dfa_dict, init_state, library="dgl"):
+        # import matplotlib.pyplot as plt
+        nxg, init_node = self.get_nxg_from_dfa_dict(dfa_dict, init_state)
+
+        nxg = nx.ego_graph(nxg, init_node, radius=8)
 
         nxg = nxg.reverse(copy=True)
 
@@ -30,6 +43,7 @@ class DFABuilder(object):
         g = dgl.DGLGraph()
         g.from_networkx(nxg, node_attrs=["feat", "is_root"], edge_attrs=["type"]) # dgl does not support string attributes (i.e., token)
         return g
+
 
     def _get_guard_embeddings(self, guard):
         embeddings = []
@@ -42,7 +56,6 @@ class DFABuilder(object):
         guard = guard.split("&")
         cnf = []
         seen_atoms = []
-        # print("guard", guard)
         for c in guard:
             atoms = c.split("|")
             clause = []
@@ -94,10 +107,8 @@ class DFABuilder(object):
                 return False
         return True
 
-    def dfa2nxg(self, mvc_dfa, minimize=False):
-        """ converts a mvc format dfa into a networkx dfa """
+    def dfa2nxg(self, dfa_dict, init_node, minimize=False):
 
-        dfa_dict, init_node = dfa2dict(mvc_dfa)
         init_node = str(init_node)
 
         nxg = nx.DiGraph()
@@ -114,6 +125,9 @@ class DFABuilder(object):
                     nxg.add_edge(start, str(end), label='{} | {}'.format(existing_label, action))
                 else:
                     nxg.add_edge(start, str(end), label=action)
+
+        nxg = nx.ego_graph(nxg, init_node, radius=5)
+        accepting_states = list(set(accepting_states).intersection(set(nxg.nodes)))
 
         return init_node, accepting_states, nxg
 
@@ -159,13 +173,12 @@ class DFABuilder(object):
 
         for node in nxg.nodes:
             nxg.add_edge(node, node, type=edge_types["self"])
+        return nxg, init_node
 
-        return nxg
-
-    def get_nxg_from_dfa(self, dfa):
-        init_node, accepting_states, nxg = self.dfa2nxg(dfa)
-        dfa_nxg = self._format(init_node, accepting_states, nxg)
-        return dfa_nxg
+    def get_nxg_from_dfa_dict(self, dfa_dict, init_state):
+        init_node, accepting_states, nxg = self.dfa2nxg(dfa_dict, init_state)
+        dfa_nxg, init_node = self._format(init_node, accepting_states, nxg)
+        return dfa_nxg, init_node
 
 
 def draw(G, formula):
