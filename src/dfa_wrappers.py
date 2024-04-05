@@ -68,7 +68,7 @@ class DFAEnv(gym.Wrapper):
 
         # Defining an DFA goal
         self.dfa_goal     = self.sample_dfa_goal()
-        self.dfa_original = self.dfa_goal
+        self.dfa_goal_original = self.dfa_goal
 
         # Adding the DFA goal to the observation
         if self.progression_mode == "partial":
@@ -87,13 +87,14 @@ class DFAEnv(gym.Wrapper):
         self.dfa_goal = self.progression(self.dfa_goal, truth_assignment)
         self.obs      = next_obs
 
-        dfa_reward, dfa_done = self.get_dfa_reward_and_dfa_done(self.dfa_goal)
+        # TODO: Remove done DFAs
+        dfa_reward, dfa_done = self.get_dfa_goal_reward_and_done(self.dfa_goal)
 
         # Computing the new observation and returning the outcome of this action
         if self.progression_mode == "full":
             dfa_obs = {'features': self.obs,'text': self.dfa_goal}
         elif self.progression_mode == "none":
-            dfa_obs = {'features': self.obs,'text': self.dfa_original}
+            dfa_obs = {'features': self.obs,'text': self.dfa_goal_original}
         elif self.progression_mode == "partial":
             dfa_obs = {'features': self.obs, 'progress_info': self.progress_info(self.dfa_goal)}
         else:
@@ -103,43 +104,53 @@ class DFAEnv(gym.Wrapper):
         done    = env_done or dfa_done
         return dfa_obs, reward, done, info
 
-    def get_dfa_reward_and_dfa_done(self, dfa):
+    def get_dfa_goal_reward_and_done(self, dfas):
+        dfa_rewards = []
+        dfa_dones = []
+        for dfa in dfas:
+            dfa_reward, dfa_done = self.get_dfa_reward_and_done(dfa)
+            dfa_rewards.append(dfa_reward)
+            dfa_dones.append(dfa_done)
+        return min(dfa_rewards), all(dfa_dones)
+
+    def get_dfa_reward_and_done(self, dfa):
         start_state = dfa.start
         start_state_label = dfa._label(start_state)
         states = dfa.states()
 
-        if start_state_label == True: # If starting state of self.dfa_goal is accepting, then dfa_reward is 1.0.
+        if start_state_label == True: # If starting state of dfa is accepting, then dfa_reward is 1.0.
             dfa_reward = 1.0
             dfa_done = True
-        elif len(states) == 1: # If starting state of self.dfa_goal is rejecting and self.dfa_goal has a single state, then dfa_reward is reject_reward.
+        elif len(states) == 1: # If starting state of dfa is rejecting and self.dfa_goal has a single state, then dfa_reward is reject_reward.
             dfa_reward = -1 # Or maybe 0.0
             dfa_done = True
         else:
-            dfa_reward = 0.0 # If starting state of self.dfa_goal is rejecting and self.dfa_goal has a multiple states, then dfa_reward is 0.0.
+            dfa_reward = 0.0 # If starting state of dfa is rejecting and self.dfa_goal has a multiple states, then dfa_reward is 0.0.
             dfa_done = False
 
         return dfa_reward, dfa_done
 
-    def progression(self, dfa, truth_assignment, start=None):
+    def progression(self, dfas, truth_assignment, start=None):
         import attr
-        dfa = attr.evolve(dfa, start=dfa.transition(truth_assignment, start=start))
-        return dfa
+        return tuple(self.dfa_progression(dfa, truth_assignment, start) for dfa in dfas)
 
+    def dfa_progression(self, dfa, truth_assignment, start=None):
+        import attr
+        return attr.evolve(dfa, start=dfa.transition(truth_assignment, start=start))
 
     # # X is a vector where index i is 1 if prop i progresses the formula, -1 if it falsifies it, 0 otherwise.
-    def progress_info(self, dfa):
+    def progress_info(self, dfas):
         propositions = self.env.get_propositions()
         X = np.zeros(len(self.propositions))
-
-        for i in range(len(propositions)):
-            progress_i = self.progression(dfa, propositions[i])
-            dfa_reward, _ = self.get_dfa_reward_and_dfa_done(progress_i)
-            X[i] = dfa_reward
+        for dfa in dfas:
+            for i in range(len(propositions)):
+                progress_i = self.dfa_progression(dfa, propositions[i])
+                dfa_reward, _ = self.get_dfa_reward_and_done(progress_i)
+                X[i] = dfa_reward
         return X
 
     def sample_dfa_goal(self):
         return self.sampler.sample()
-
 
     def get_events(self, obs, act, next_obs):
         # This function must return the events that currently hold on the environment

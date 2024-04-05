@@ -169,7 +169,24 @@ def preprocess4gnn(texts, graph_builder, device=None):
     """
     This function receives the LTL formulas and convert them into inputs for a GNN
     """
-    return np.array([[graph_builder(text).to(device)] for text in texts])
+    try:
+        return np.array([[graph_builder(text).to(device)] for text in texts])
+    except AttributeError:
+        # a = []
+        # n = 0
+        # for text in texts:
+        #     b = []
+        #     for dfa in text:
+        #         b.append([graph_builder(dfa).to(device)])
+        #     a.append(b)
+        #     n = max(n, len(b))
+        # for b in a:
+        #     for _ in range(n - len(b)):
+        #         b.append([None])
+        # a = np.array(a)
+        # return a
+        return np.array([[[graph_builder(dfa).to(device)] for dfa in text] for text in texts], dtype=list)
+
 
 
 class Vocabulary:

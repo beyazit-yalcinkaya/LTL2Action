@@ -123,8 +123,12 @@ class ACModel(nn.Module, torch_ac.ACModel):
 
         # Adding GNN
         elif self.use_ast:
-            embed_gnn = self.gnn(obs.text)
-            embedding = torch.cat((embedding, embed_gnn), dim=1) if embedding is not None else embed_gnn
+            if len(obs.text.shape) == 2:
+                embed_gnn = self.gnn(obs.text)
+                embedding = torch.cat((embedding, embed_gnn), dim=1) if embedding is not None else embed_gnn
+            else:
+                embed_gnn = torch.stack([self.gnn(np.array(dfas)).mean(dim=0) for dfas in obs.text], dim=0)
+                embedding = torch.cat((embedding, embed_gnn), dim=1) if embedding is not None else embed_gnn
 
         # Actor
         dist = self.actor(embedding)

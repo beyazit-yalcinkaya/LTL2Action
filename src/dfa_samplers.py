@@ -125,13 +125,12 @@ class EventuallySampler(DFASampler):
                 if s[i] != () and c in s[i][0]:
                     return s[:i] + (s[i][1:],) + s[i + 1:]
             return s
-        return DFA(
+        return (DFA(
             start=seqs,
             inputs=self.propositions,
             label=lambda s: s == tuple(tuple() for _ in range(conjs)),
             transition=delta,
-        )
-
+        ),)
 
     def sample_sequence(self):
         length = random.randint(*self.levels)
@@ -151,6 +150,19 @@ class EventuallySampler(DFASampler):
             last = c
 
         return tuple(seq)
+
+class CompositionalEventuallySampler(EventuallySampler):
+    def __init__(self, propositions, min_levels = 1, max_levels=4, min_conjunctions=1, max_conjunctions=3):
+        super().__init__(propositions)
+        assert(len(propositions) >= 3)
+        self.conjunctions = (int(min_conjunctions), int(max_conjunctions))
+        self.levels = (int(min_levels), int(max_levels))
+
+    def sample(self):
+        conjs = random.randint(*self.conjunctions)
+        seqs = tuple(self.sample_sequence() for _ in range(conjs))
+        dfas = tuple(DFA(start=seq, inputs=self.propositions, label=lambda s: s == tuple(), transition=lambda s, c: s[1:] if s != () and c in s[0] else s) for seq in seqs)
+        return dfas
 
 
 class AdversarialEnvSampler(DFASampler):
@@ -187,7 +199,8 @@ def getRegisteredSamplers(propositions):
     return [SequenceSampler(propositions),
             UntilTaskSampler(propositions),
             DefaultSampler(propositions),
-            EventuallySampler(propositions)]
+            EventuallySampler(propositions),
+            CompositionalEventuallySampler(propositions)]
 
 # The DFASampler factory method that instantiates the proper sampler
 # based on the @sampler_id.
@@ -212,6 +225,8 @@ def getDFASampler(sampler_id, propositions):
         return AdversarialEnvSampler(propositions)
     elif (tokens[0] == "Eventually"):
         return EventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
+    elif (tokens[0] == "CompositionalEventually"):
+        return CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     else: # "Default"
         return DefaultSampler(propositions)
 
