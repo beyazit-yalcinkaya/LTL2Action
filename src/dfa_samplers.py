@@ -125,12 +125,12 @@ class EventuallySampler(DFASampler):
                 if s[i] != () and c in s[i][0]:
                     return s[:i] + (s[i][1:],) + s[i + 1:]
             return s
-        return (DFA(
+        return ("NOP", (DFA(
             start=seqs,
             inputs=self.propositions,
             label=lambda s: s == tuple(tuple() for _ in range(conjs)),
             transition=delta,
-        ),)
+        ),))
 
     def sample_sequence(self):
         length = random.randint(*self.levels)
@@ -162,7 +162,7 @@ class CompositionalEventuallySampler(EventuallySampler):
         conjs = random.randint(*self.conjunctions)
         seqs = tuple(self.sample_sequence() for _ in range(conjs))
         dfas = tuple(DFA(start=seq, inputs=self.propositions, label=lambda s: s == tuple(), transition=lambda s, c: s[1:] if s != () and c in s[0] else s) for seq in seqs)
-        return dfas
+        return ("AND", dfas)
 
 
 class AdversarialEnvSampler(DFASampler):

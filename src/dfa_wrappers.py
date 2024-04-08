@@ -87,8 +87,9 @@ class DFAEnv(gym.Wrapper):
         self.dfa_goal = self.progression(self.dfa_goal, truth_assignment)
         self.obs      = next_obs
 
-        # TODO: Remove done DFAs
-        dfa_reward, dfa_done = self.get_dfa_goal_reward_and_done(self.dfa_goal)
+        # This function also returns a new tuple of DFAs consisting of ones that are not done.
+        # TODO: This is wrong. Removing of the rejecting DFAs is wrong. Also, have and/or semantics into reward.
+        dfa_reward, dfa_done, self.dfa_goal = self.get_dfa_goal_reward_and_done(self.dfa_goal)
 
         # Computing the new observation and returning the outcome of this action
         if self.progression_mode == "full":
@@ -104,14 +105,22 @@ class DFAEnv(gym.Wrapper):
         done    = env_done or dfa_done
         return dfa_obs, reward, done, info
 
-    def get_dfa_goal_reward_and_done(self, dfas):
+    def get_dfa_goal_reward_and_done(self, dfa_goal):
+        op, dfas = dfa_goal
         dfa_rewards = []
         dfa_dones = []
+        new_dfas = []
         for dfa in dfas:
             dfa_reward, dfa_done = self.get_dfa_reward_and_done(dfa)
             dfa_rewards.append(dfa_reward)
             dfa_dones.append(dfa_done)
-        return min(dfa_rewards), all(dfa_dones)
+            if not dfa_done:
+                new_dfas.append(dfa)
+        if len(new_dfas) == 1:
+            new_dfas = ("NOP", tuple(new_dfas))
+        else:
+            new_dfas = (op, tuple(new_dfas))
+        return min(dfa_rewards), all(dfa_dones), new_dfas
 
     def get_dfa_reward_and_done(self, dfa):
         start_state = dfa.start
@@ -130,9 +139,9 @@ class DFAEnv(gym.Wrapper):
 
         return dfa_reward, dfa_done
 
-    def progression(self, dfas, truth_assignment, start=None):
-        import attr
-        return tuple(self.dfa_progression(dfa, truth_assignment, start) for dfa in dfas)
+    def progression(self, dfa_goal, truth_assignment, start=None):
+        op, dfas = dfa_goal
+        return (op, tuple(self.dfa_progression(dfa, truth_assignment, start) for dfa in dfas))
 
     def dfa_progression(self, dfa, truth_assignment, start=None):
         import attr

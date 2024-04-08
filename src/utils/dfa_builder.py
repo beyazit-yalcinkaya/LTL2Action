@@ -9,6 +9,8 @@ from pysat.solvers import Solver
 
 FEATURE_SIZE = 22 # TODO: Fix this
 
+feature_inds = {"rejecting": -1, "accepting": -2, "temp": -3, "normal": -4, "init": -5, "AND": -6, "OR": -7, "NOP": -8}
+
 """
 A class that can take an DFA formula and generate the Abstract Syntax Tree (DFA) of it. This
 code can generate trees in either Networkx or DGL formats. And uses caching to remember recently
@@ -24,18 +26,33 @@ class DFABuilder(object):
     def __ring_key__(self):
         return "DFABuilder"
 
-    def __call__(self, dfa, library="dgl"):
-        dfa_dict, init_state = dfa2dict(dfa)
-        return self._to_graph(dfa_dict, init_state, library)
+    def __call__(self, dfas, library="dgl"):
+        op, dfas = dfas
+        assert op in ["AND", "OR", "NOP"]
+        dfas = tuple(dfa2dict(dfa) for dfa in dfas)
+        return self._to_graph(op, dfas, library)
 
     @ring.lru(maxsize=1000000)
-    def _to_graph(self, dfa_dict, init_state, library="dgl"):
-        # import matplotlib.pyplot as plt
-        nxg, init_node = self.get_nxg_from_dfa_dict(dfa_dict, init_state)
+    def _to_graph(self, op, dfas, library="dgl"):
+        from utils.env import edge_types
+        nxgs = []
+        init_nodes = []
+        for i, (dfa_dict, init_state) in enumerate(dfas):
+            nxg_i, init_node = self.get_nxg_from_dfa_dict(dfa_dict, init_state)
+            nxg_i = nxg_i.reverse(copy=True)
+            nxg_i = nx.relabel_nodes(nxg_i, lambda x: str(i) + "_" + x, copy=True)
+            nxgs.append(nxg_i)
+            init_nodes.append(str(i) + "_" + init_node)
 
-        nxg = nx.ego_graph(nxg, init_node, radius=8)
+        nxg = nx.compose_all(nxgs)
+        nx.set_node_attributes(nxg, 0.0, "is_root")
+        nxg.add_node(op, feat=np.array([[0.0] * FEATURE_SIZE]), is_root=1.0)
+        nxg.nodes[op]["feat"][0][feature_inds[op]] = 1.0
+        for init_node in init_nodes:
+            nxg.add_edge(init_node, op, type=edge_types[op])
 
-        nxg = nxg.reverse(copy=True)
+        for node in nxg.nodes:
+            nxg.add_edge(node, node, type=edge_types["self"])
 
         if (library == "networkx"): return nxg
 
@@ -85,7 +102,7 @@ class DFABuilder(object):
         is_there_onehot = False
         is_there_all_zero = False
         onehot_embedding = [0.0] * FEATURE_SIZE
-        onehot_embedding[-3] = 1.0 # Since it will be a temp node
+        onehot_embedding[feature_inds["temp"]] = 1.0 # Since it will be a temp node
         full_embeddings = self._get_guard_embeddings(guard)
         for embed in full_embeddings:
             # discard all non-onehot embeddings (a one-hot embedding must contain only a single 1)
@@ -126,7 +143,7 @@ class DFABuilder(object):
                 else:
                     nxg.add_edge(start, str(end), label=action)
 
-        nxg = nx.ego_graph(nxg, init_node, radius=5)
+        # nxg = nx.ego_graph(nxg, init_node, radius=5)
         accepting_states = list(set(accepting_states).intersection(set(nxg.nodes)))
 
         return init_node, accepting_states, nxg
@@ -141,13 +158,13 @@ class DFABuilder(object):
 
         for node in nxg.nodes:
             nxg.nodes[node]["feat"] = np.array([[0.0] * FEATURE_SIZE])
-            nxg.nodes[node]["feat"][0][-4] = 1.0
+            nxg.nodes[node]["feat"][0][feature_inds["normal"]] = 1.0
             if node in accepting_states:
-                nxg.nodes[node]["feat"][0][-2] = 1.0
+                nxg.nodes[node]["feat"][0][feature_inds["accepting"]] = 1.0
             if node in rejecting_states:
-                nxg.nodes[node]["feat"][0][-1] = 1.0
+                nxg.nodes[node]["feat"][0][feature_inds["rejecting"]] = 1.0
 
-        nxg.nodes[init_node]["feat"][0][-5] = 1.0
+        nxg.nodes[init_node]["feat"][0][feature_inds["init"]] = 1.0
 
         edges = deepcopy(nxg.edges)
 
@@ -168,11 +185,6 @@ class DFABuilder(object):
             nxg.add_edge(e[0], new_node_name, type=edge_types["normal-to-temp"])
             nxg.add_edge(new_node_name, e[1], type=edge_types["temp-to-normal"])
 
-        nx.set_node_attributes(nxg, 0.0, "is_root")
-        nxg.nodes[init_node]["is_root"] = 1.0 # is_root means current state
-
-        for node in nxg.nodes:
-            nxg.add_edge(node, node, type=edge_types["self"])
         return nxg, init_node
 
     def get_nxg_from_dfa_dict(self, dfa_dict, init_state):
