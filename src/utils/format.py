@@ -185,7 +185,7 @@ def preprocess4gnn(texts, graph_builder, device=None):
         #         b.append([None])
         # a = np.array(a)
         # return a
-        return np.array([[[graph_builder(dfa).to(device)] for dfa in text] for text in texts], dtype=list)
+        return np.array([np.array([[graph_builder(dfa).to(device)] for dfa in text]) for text in texts], dtype=np.ndarray)
 
 
 
