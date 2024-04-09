@@ -9,7 +9,7 @@ from pysat.solvers import Solver
 
 FEATURE_SIZE = 22 # TODO: Fix this
 
-feature_inds = {"rejecting": -1, "accepting": -2, "temp": -3, "normal": -4, "init": -5, "AND": -6, "OR": -7, "NOP": -8}
+feature_inds = {"rejecting": -1, "accepting": -2, "temp": -3, "normal": -4, "init": -5, "AND": -6, "OR": -7}
 
 """
 A class that can take an DFA formula and generate the Abstract Syntax Tree (DFA) of it. This
@@ -26,33 +26,42 @@ class DFABuilder(object):
     def __ring_key__(self):
         return "DFABuilder"
 
-    def __call__(self, dfas, library="dgl"):
-        op, dfas = dfas
-        assert op in ["AND", "OR", "NOP"]
-        dfas = tuple(dfa2dict(dfa) for dfa in dfas)
-        return self._to_graph(op, dfas, library)
+    def __call__(self, dfa_cnf_goal, library="dgl"):
+        dfa_dict_cnf_goal = tuple(tuple(dfa2dict(dfa) for dfa in dfa_clause) for dfa_clause in dfa_cnf_goal)
+        return self._to_graph(dfa_dict_cnf_goal, library)
 
     @ring.lru(maxsize=1000000)
-    def _to_graph(self, op, dfas, library="dgl"):
+    def _to_graph(self, dfa_dict_cnf_goal, library="dgl"):
         from utils.env import edge_types
-        nxgs = []
-        init_nodes = []
-        for i, (dfa_dict, init_state) in enumerate(dfas):
-            nxg_i, init_node = self.get_nxg_from_dfa_dict(dfa_dict, init_state)
-            nxg_i = nxg_i.reverse(copy=True)
-            nxg_i = nx.relabel_nodes(nxg_i, lambda x: str(i) + "_" + x, copy=True)
-            nxgs.append(nxg_i)
-            init_nodes.append(str(i) + "_" + init_node)
-
-        nxg = nx.compose_all(nxgs)
-        nx.set_node_attributes(nxg, 0.0, "is_root")
-        nxg.add_node(op, feat=np.array([[0.0] * FEATURE_SIZE]), is_root=1.0)
-        nxg.nodes[op]["feat"][0][feature_inds[op]] = 1.0
-        for init_node in init_nodes:
-            nxg.add_edge(init_node, op, type=edge_types[op])
-
-        for node in nxg.nodes:
-            nxg.add_edge(node, node, type=edge_types["self"])
+        cnf_nxgs = []
+        cnf_or_nodes = []
+        for i, dfa_dict_clause in enumerate(dfa_dict_cnf_goal):
+            clause_nxgs = []
+            clause_init_nodes = []
+            for j, (dfa_dict, init_state) in enumerate(dfa_dict_clause):
+                clause_nxg, clause_init_node = self.get_nxg_from_dfa_dict(dfa_dict, init_state)
+                clause_nxg = clause_nxg.reverse(copy=True)
+                clause_nxg = nx.relabel_nodes(clause_nxg, lambda x: str(i) + "_" + str(j) + "_" + x, copy=True)
+                clause_nxgs.append(clause_nxg)
+                clause_init_nodes.append(str(i) + "_" + str(j) + "_" + clause_init_node)
+            composed_clause_nxg = nx.compose_all(clause_nxgs)
+            or_node = str(i) + "_OR"
+            composed_clause_nxg.add_node(or_node, feat=np.array([[0.0] * FEATURE_SIZE]))
+            composed_clause_nxg.nodes[or_node]["feat"][0][feature_inds["OR"]] = 1.0
+            for clause_init_node in clause_init_nodes:
+                composed_clause_nxg.add_edge(clause_init_node, or_node, type=edge_types["OR"])
+            cnf_nxgs.append(composed_clause_nxg)
+            cnf_or_nodes.append(or_node)
+        composed_cnf_nxg = nx.compose_all(cnf_nxgs)
+        nx.set_node_attributes(composed_cnf_nxg, 0.0, "is_root")
+        and_node = "AND"
+        composed_cnf_nxg.add_node(and_node, feat=np.array([[0.0] * FEATURE_SIZE]), is_root=1.0)
+        composed_cnf_nxg.nodes[and_node]["feat"][0][feature_inds["AND"]] = 1.0
+        for cnf_or_node in cnf_or_nodes:
+            composed_cnf_nxg.add_edge(cnf_or_node, and_node, type=edge_types["AND"])
+        for node in composed_cnf_nxg.nodes:
+            composed_cnf_nxg.add_edge(node, node, type=edge_types["self"])
+        nxg = composed_cnf_nxg
 
         if (library == "networkx"): return nxg
 
@@ -60,7 +69,6 @@ class DFABuilder(object):
         g = dgl.DGLGraph()
         g.from_networkx(nxg, node_attrs=["feat", "is_root"], edge_attrs=["type"]) # dgl does not support string attributes (i.e., token)
         return g
-
 
     def _get_guard_embeddings(self, guard):
         embeddings = []
@@ -204,7 +212,7 @@ def draw(G, formula):
     pos=graphviz_layout(G, prog='dot')
     # labels = nx.get_node_attributes(G,'token')
     labels = G.nodes
-    nx.draw(G, pos, with_labels=True, arrows=True, labels=labels, node_shape='s', edgelist=list(nx.get_edge_attributes(G,'type')), node_size=500, node_color="white") #edge_color=edge_color
+    nx.draw(G, pos, with_labels=True, arrows=True, node_shape='s', edgelist=list(nx.get_edge_attributes(G,'type')), node_size=500, node_color="white") #edge_color=edge_color
     plt.show()
 
 """

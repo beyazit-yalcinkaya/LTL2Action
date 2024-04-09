@@ -87,8 +87,6 @@ class DFAEnv(gym.Wrapper):
         self.dfa_goal = self.progression(self.dfa_goal, truth_assignment)
         self.obs      = next_obs
 
-        # This function also returns a new tuple of DFAs consisting of ones that are not done.
-        # TODO: This is wrong. Removing of the rejecting DFAs is wrong. Also, have and/or semantics into reward.
         dfa_reward, dfa_done, self.dfa_goal = self.get_dfa_goal_reward_and_done(self.dfa_goal)
 
         # Computing the new observation and returning the outcome of this action
@@ -105,22 +103,29 @@ class DFAEnv(gym.Wrapper):
         done    = env_done or dfa_done
         return dfa_obs, reward, done, info
 
-    def get_dfa_goal_reward_and_done(self, dfa_goal):
-        op, dfas = dfa_goal
+    def get_dfa_goal_reward_and_done(self, dfa_cnf_goal):
+        dfa_clause_rewards = []
+        dfa_clause_dones = []
+        dfa_clause_actives = []
+        for dfa_clause in dfa_cnf_goal:
+            dfa_clause_reward, dfa_clause_done, dfa_clause = self.get_dfa_clause_reward_and_done(dfa_clause)
+            dfa_clause_rewards.append(dfa_clause_reward)
+            dfa_clause_dones.append(dfa_clause_done)
+            if not dfa_clause_done:
+                dfa_clause_actives.append(dfa_clause)
+        return min(dfa_clause_rewards), all(dfa_clause_dones), tuple(dfa_clause_actives)
+
+    def get_dfa_clause_reward_and_done(self, dfa_clause):
         dfa_rewards = []
         dfa_dones = []
-        new_dfas = []
-        for dfa in dfas:
+        dfa_actives = []
+        for dfa in dfa_clause:
             dfa_reward, dfa_done = self.get_dfa_reward_and_done(dfa)
             dfa_rewards.append(dfa_reward)
             dfa_dones.append(dfa_done)
             if not dfa_done:
-                new_dfas.append(dfa)
-        if len(new_dfas) == 1:
-            new_dfas = ("NOP", tuple(new_dfas))
-        else:
-            new_dfas = (op, tuple(new_dfas))
-        return min(dfa_rewards), all(dfa_dones), new_dfas
+                dfa_actives.append(dfa)
+        return max(dfa_rewards), any(dfa_dones), tuple(dfa_actives)
 
     def get_dfa_reward_and_done(self, dfa):
         start_state = dfa.start
@@ -131,7 +136,7 @@ class DFAEnv(gym.Wrapper):
             dfa_reward = 1.0
             dfa_done = True
         elif len(states) == 1: # If starting state of dfa is rejecting and self.dfa_goal has a single state, then dfa_reward is reject_reward.
-            dfa_reward = -1 # Or maybe 0.0
+            dfa_reward = -1.0 # Or maybe 0.0
             dfa_done = True
         else:
             dfa_reward = 0.0 # If starting state of dfa is rejecting and self.dfa_goal has a multiple states, then dfa_reward is 0.0.
@@ -139,9 +144,11 @@ class DFAEnv(gym.Wrapper):
 
         return dfa_reward, dfa_done
 
-    def progression(self, dfa_goal, truth_assignment, start=None):
-        op, dfas = dfa_goal
-        return (op, tuple(self.dfa_progression(dfa, truth_assignment, start) for dfa in dfas))
+    def progression(self, dfa_cnf_goal, truth_assignment, start=None):
+        return tuple(self.dfa_clause_progression(dfa_clause, truth_assignment, start) for dfa_clause in dfa_cnf_goal)
+
+    def dfa_clause_progression(self, dfa_clause, truth_assignment, start=None):
+        return tuple(self.dfa_progression(dfa, truth_assignment, start) for dfa in dfa_clause)
 
     def dfa_progression(self, dfa, truth_assignment, start=None):
         import attr
