@@ -125,12 +125,12 @@ class EventuallySampler(DFASampler):
                 if s[i] != () and c in s[i][0]:
                     return s[:i] + (s[i][1:],) + s[i + 1:]
             return s
-        return (((DFA(
+        return ((DFA(
             start=seqs,
             inputs=self.propositions,
             label=lambda s: s == tuple(tuple() for _ in range(conjs)),
             transition=delta,
-        ),),),)
+        ),),)
 
     def sample_sequence(self):
         length = random.randint(*self.levels)
@@ -153,7 +153,7 @@ class EventuallySampler(DFASampler):
 
 class CompositionalEventuallySampler(EventuallySampler):
     def __init__(self, propositions, min_levels = 1, max_levels=4, min_conjunctions=1, max_conjunctions=3):
-        super().__init__(propositions)
+        super().__init__(propositions, min_levels, max_levels, min_conjunctions, max_conjunctions)
         assert(len(propositions) >= 3)
         self.conjunctions = (int(min_conjunctions), int(max_conjunctions))
         self.levels = (int(min_levels), int(max_levels))
