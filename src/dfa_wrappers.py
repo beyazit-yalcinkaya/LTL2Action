@@ -19,7 +19,7 @@ import numpy as np
 import gym
 from gym import spaces
 import random
-from dfa_samplers import getDFASampler, SequenceSampler
+from dfa_samplers import getDFASampler
 
 class DFAEnv(gym.Wrapper):
     def __init__(self, env, progression_mode="full", dfa_sampler=None, intrinsic=0.0):
@@ -46,18 +46,6 @@ class DFAEnv(gym.Wrapper):
         self.observation_space = spaces.Dict({'features': env.observation_space})
         self.intrinsic = intrinsic
 
-
-    def sample_dfa_goal(self):
-        # This function must return an DFA formula for the task
-        # Format:
-        #(
-        #    'and',
-        #    ('until','True', ('and', 'd', ('until','True',('not','c')))),
-        #    ('until','True', ('and', 'a', ('until','True', ('and', 'b', ('until','True','c')))))
-        #)
-        # NOTE: The propositions must be represented by a char
-        raise NotImplementedError
-
     def get_events(self, obs, act, next_obs):
         # This function must return the events that currently hold on the environment
         # NOTE: The events are represented by a string containing the propositions with positive values only (e.g., "ac" means that only propositions 'a' and 'b' hold)
@@ -67,7 +55,7 @@ class DFAEnv(gym.Wrapper):
         self.obs = self.env.reset()
 
         # Defining an DFA goal
-        self.dfa_goal     = self.sample_dfa_goal()
+        self.dfa_goal     = self.sampler.sample()
         self.dfa_goal_original = self.dfa_goal
 
         # Adding the DFA goal to the observation
@@ -165,14 +153,11 @@ class DFAEnv(gym.Wrapper):
                 X[i] = dfa_reward
         return X
 
-    def sample_dfa_goal(self):
-        return self.sampler.sample()
-
     def get_events(self, obs, act, next_obs):
-        # This function must return the events that currently hold on the environment
-        # NOTE: The events are represented by a string containing the propositions with positive values only (e.g., "ac" means that only propositions 'a' and 'b' hold)
         return self.env.get_events()
 
+    def get_propositions(self):
+        return self.env.get_propositions()
 
 class NoDFAWrapper(gym.Wrapper):
     def __init__(self, env):
