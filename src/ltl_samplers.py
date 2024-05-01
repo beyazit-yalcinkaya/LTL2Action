@@ -36,7 +36,7 @@ class OrSampler(LTLSampler):
         return ('or', getLTLSampler(self.sampler_ids[0], self.propositions).sample(),
                         getLTLSampler(self.sampler_ids[1], self.propositions).sample())
 
-class JoinSampler(DFASampler):
+class JoinSampler(LTLSampler):
     def __init__(self, propositions, sampler_ids):
         super().__init__(propositions)
         self.n = len(sampler_ids)

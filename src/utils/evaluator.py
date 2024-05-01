@@ -15,7 +15,7 @@ via the sampler (ltl_sampler) that is passed in (model_name).
 class Eval:
     def __init__(self, env, model_name, ltl_sampler,
                 seed=0, device="cpu", argmax=False,
-                num_procs=1, ignoreLTL=False, progression_mode=True, gnn=None, recurrence=1, dumb_ac = False, discount=0.99):
+                num_procs=1, ignoreLTL=False, progression_mode=True, gnn=None, recurrence=1, dumb_ac = False, discount=0.99, isDFAGoal=False):
 
         self.env = env
         self.device = device
@@ -34,7 +34,7 @@ class Eval:
         # Load environments for evaluation
         eval_envs = []
         for i in range(self.num_procs):
-            eval_envs.append(utils.make_env(env, progression_mode, ltl_sampler, seed, 0, False))
+            eval_envs.append(utils.make_env(env, progression_mode, ltl_sampler, seed, 0, False, isDFAGoal))
 
         eval_envs[0].reset()
         if isinstance(eval_envs[0].env, LetterEnv):
@@ -112,6 +112,8 @@ if __name__ == '__main__':
                     help="number of time-steps gradient is backpropagated (default: 1). If > 1, a LSTM is added to the model to have memory.")
     parser.add_argument("--gnn", default="RGCN_8x32_ROOT_SHARED", help="use gnn to model the LTL (only if ignoreLTL==True)")
 
+    parser.add_argument("--dfa", action="store_true", default=False, help="Use DFA instead of LTL (default: False)")
+
 
     args = parser.parse_args()
 
@@ -124,7 +126,7 @@ if __name__ == '__main__':
 
         eval = utils.Eval(args.env, model_path, args.ltl_sampler,
                      seed=seed, device=torch.device("cpu"), argmax=False,
-                     num_procs=args.procs, ignoreLTL=args.ignoreLTL, progression_mode=args.progression_mode, gnn=args.gnn, recurrence=args.recurrence, dumb_ac=False, discount=args.discount)
+                     num_procs=args.procs, ignoreLTL=args.ignoreLTL, progression_mode=args.progression_mode, gnn=args.gnn, recurrence=args.recurrence, dumb_ac=False, discount=args.discount, isDFAGoal=args.dfa)
         rpe, nfpe = eval.eval(-1, episodes=args.eval_episodes, stdout=True)
         logs_returns_per_episode += rpe
         logs_num_frames_per_episode += nfpe 
