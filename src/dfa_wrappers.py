@@ -91,12 +91,12 @@ class DFAEnv(gym.Wrapper):
         done    = env_done or dfa_done
         return dfa_obs, reward, done, info
 
-    def get_dfa_goal_reward_and_done(self, dfa_cnf_goal):
+    def get_dfa_goal_reward_and_done(self, dfa_goal):
         dfa_clause_rewards = []
         dfa_clause_dones = []
         dfa_clause_actives = []
-        for dfa_clause in dfa_cnf_goal:
-            dfa_clause_reward, dfa_clause_done, dfa_clause = self.get_dfa_clause_reward_and_done(dfa_clause)
+        for dfa_clause in dfa_goal:
+            dfa_clause_reward, dfa_clause_done = self.get_dfa_clause_reward_and_done(dfa_clause)
             dfa_clause_rewards.append(dfa_clause_reward)
             dfa_clause_dones.append(dfa_clause_done)
             if not dfa_clause_done:
@@ -106,25 +106,23 @@ class DFAEnv(gym.Wrapper):
     def get_dfa_clause_reward_and_done(self, dfa_clause):
         dfa_rewards = []
         dfa_dones = []
-        dfa_actives = []
         for dfa in dfa_clause:
             dfa_reward, dfa_done = self.get_dfa_reward_and_done(dfa)
             dfa_rewards.append(dfa_reward)
             dfa_dones.append(dfa_done)
-            if not dfa_done:
-                dfa_actives.append(dfa)
-        return max(dfa_rewards), any(dfa_dones), tuple(dfa_actives)
+        return max(dfa_rewards), any(dfa_dones)
 
     def get_dfa_reward_and_done(self, dfa):
-        start_state = dfa.start
-        start_state_label = dfa._label(start_state)
+        current_state = dfa.start
+        current_state_label = dfa._label(current_state)
         states = dfa.states()
+        is_current_state_sink = sum(current_state != dfa._transition(current_state, a) for a in dfa.inputs) == 0
 
-        if start_state_label == True: # If starting state of dfa is accepting, then dfa_reward is 1.0.
+        if current_state_label == True: # If starting state of dfa is accepting, then dfa_reward is 1.0.
             dfa_reward = 1.0
             dfa_done = True
-        elif len(states) == 1: # If starting state of dfa is rejecting and self.dfa_goal has a single state, then dfa_reward is reject_reward.
-            dfa_reward = -1.0 # Or maybe 0.0
+        elif is_current_state_sink: # If starting state of dfa is rejecting and current state is a sink, then dfa_reward is reject_reward.
+            dfa_reward = -1.0
             dfa_done = True
         else:
             dfa_reward = 0.0 # If starting state of dfa is rejecting and self.dfa_goal has a multiple states, then dfa_reward is 0.0.

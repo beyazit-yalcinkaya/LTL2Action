@@ -106,7 +106,7 @@ def get_obss_preprocessor(env, gnn, progression_mode):
                 vocab_space = {"max_size": obs_space["text"], "tokens": vocab_space}
 
                 vocab = Vocabulary(vocab_space)
-                tree_builder = utils.ASTBuilder(vocab_space["tokens"])
+                tree_builder = utils.DFABuilder(vocab_space["tokens"])
 
                 def preprocess_obss(obss, device=None):
                     return torch_ac.DictList({

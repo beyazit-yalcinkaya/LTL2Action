@@ -65,9 +65,9 @@ class DFABuilder(object):
             nx.relabel_nodes(composed_cnf_nxg, {node: str(i) + "_" + node for node in composed_cnf_nxg.nodes}, copy=False)
         else:
             raise NotImplemented
-        nx.set_node_attributes(composed_cnf_nxg, 0.0, "is_root")
+        nx.set_node_attributes(composed_cnf_nxg, np.array([0.0], dtype=np.float32), "is_root")
         and_node = "AND"
-        composed_cnf_nxg.add_node(and_node, feat=np.array([[0.0] * FEATURE_SIZE]), is_root=1.0)
+        composed_cnf_nxg.add_node(and_node, feat=np.array([[0.0] * FEATURE_SIZE]), is_root=np.array([1.0], dtype=np.float32))
         composed_cnf_nxg.nodes[and_node]["feat"][0][feature_inds["AND"]] = 1.0
         for cnf_or_node in cnf_or_nodes:
             composed_cnf_nxg.add_edge(cnf_or_node, and_node, type=edge_types["AND"])
