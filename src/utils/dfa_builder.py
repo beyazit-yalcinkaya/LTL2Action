@@ -28,7 +28,7 @@ class DFABuilder(object):
     def __call__(self, dfa_goal, library="dgl"):
         return self._to_graph(dfa_goal, library)
 
-    @ring.lru(maxsize=1000000)
+    @ring.lru(maxsize=400000)
     def _to_graph(self, dfa_goal, library="dgl"):
         from utils.env import edge_types
         cnf_nxgs = []
@@ -82,7 +82,7 @@ class DFABuilder(object):
         g.from_networkx(nxg, node_attrs=["feat", "is_root"], edge_attrs=["type"]) # dgl does not support string attributes (i.e., token)
         return g
 
-    @ring.lru(maxsize=1000000)
+    @ring.lru(maxsize=600000)
     def dfa_to_formatted_nxg(self, dfa):
         from utils.env import edge_types
 
