@@ -6,8 +6,6 @@ import networkx as nx
 from copy import deepcopy
 from pysat.solvers import Solver
 
-FEATURE_SIZE = 22 # TODO: Fix this
-
 feature_inds = {"rejecting": -1, "accepting": -2, "temp": -3, "normal": -4, "init": -5, "AND": -6, "OR": -7}
 
 """
@@ -18,8 +16,8 @@ generated trees.
 class DFABuilder(object):
     def __init__(self, propositions):
         super(DFABuilder, self).__init__()
-
         self.propositions = propositions
+        self.feature_size = len(self.propositions) + len(feature_inds)
 
     # To make the caching work.
     def __ring_key__(self):
@@ -51,7 +49,7 @@ class DFABuilder(object):
             else:
                 raise NotImplemented
             or_node = "OR"
-            composed_clause_nxg.add_node(or_node, feat=np.array([[0.0] * FEATURE_SIZE]))
+            composed_clause_nxg.add_node(or_node, feat=np.array([[0.0] * self.feature_size]))
             composed_clause_nxg.nodes[or_node]["feat"][0][feature_inds["OR"]] = 1.0
             for clause_init_node in clause_init_nodes:
                 composed_clause_nxg.add_edge(clause_init_node, or_node, type=edge_types["OR"])
@@ -67,7 +65,7 @@ class DFABuilder(object):
             raise NotImplemented
         nx.set_node_attributes(composed_cnf_nxg, np.array([0.0], dtype=np.float32), "is_root")
         and_node = "AND"
-        composed_cnf_nxg.add_node(and_node, feat=np.array([[0.0] * FEATURE_SIZE]), is_root=np.array([1.0], dtype=np.float32))
+        composed_cnf_nxg.add_node(and_node, feat=np.array([[0.0] * self.feature_size]), is_root=np.array([1.0], dtype=np.float32))
         composed_cnf_nxg.nodes[and_node]["feat"][0][feature_inds["AND"]] = 1.0
         for cnf_or_node in cnf_or_nodes:
             composed_cnf_nxg.add_edge(cnf_or_node, and_node, type=edge_types["AND"])
@@ -93,7 +91,7 @@ class DFABuilder(object):
         for s in dfa.states():
             start = str(s)
             nxg.add_node(start)
-            nxg.nodes[start]["feat"] = np.array([[0.0] * FEATURE_SIZE])
+            nxg.nodes[start]["feat"] = np.array([[0.0] * self.feature_size])
             nxg.nodes[start]["feat"][0][feature_inds["normal"]] = 1.0
             if dfa._label(s): # is accepting?
                 nxg.nodes[start]["feat"][0][feature_inds["accepting"]] = 1.0
@@ -106,7 +104,7 @@ class DFABuilder(object):
                     continue # We define self loops later when composing graphs
                 end = str(e)
                 if end not in embeddings.keys():
-                    embeddings[end] = np.zeros(FEATURE_SIZE)
+                    embeddings[end] = np.zeros(self.feature_size)
                     embeddings[end][feature_inds["temp"]] = 1.0 # Since it is a temp node
                 embeddings[end][self.propositions.index(a)] = 1.0
             for end in embeddings.keys():
