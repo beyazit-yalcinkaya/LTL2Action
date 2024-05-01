@@ -66,19 +66,82 @@ class UntilTaskSampler(DFASampler):
         n_conjs = random.randint(*self.conjunctions)
         p = random.sample(self.propositions,2*self.levels[1]*n_conjs)
         ltl = None
+        seqs = []
         b = 0
         for i in range(n_conjs):
             n_levels = random.randint(*self.levels)
             # Sampling an until task of *n_levels* levels
             until_task = ('until',('not',p[b]),p[b+1])
+            seq = [(p[b], p[b+1])]
             b +=2
             for j in range(1,n_levels):
                 until_task = ('until',('not',p[b]),('and', p[b+1], until_task))
+                seq = [(p[b], p[b+1])] + seq
                 b +=2
             # Adding the until task to the conjunction of formulas that the agent have to solve
             if ltl is None: ltl = until_task
             else:           ltl = ('and',until_task,ltl)
-        return ltl
+            seqs = [tuple(seq)] + seqs
+        seqs = tuple(seqs)
+        def delta(s, c):
+            if s is not None:
+                for i in range(len(s)):
+                    if s[i] != () and c != s[i][0][0] and c == s[i][0][1]:
+                        return s[:i] + (s[i][1:],) + s[i + 1:]
+                    elif s[i] != () and c == s[i][0][0]:
+                        return None
+            return s
+        return ((DFA(
+            start=seqs,
+            inputs=self.propositions,
+            label=lambda s: s == tuple(tuple() for _ in range(n_conjs)),
+            transition=delta,
+        ),),)
+
+class CompositionalUntilTaskSampler(DFASampler):
+    def __init__(self, propositions, min_levels=1, max_levels=2, min_conjunctions=1 , max_conjunctions=2):
+        super().__init__(propositions)
+        self.levels       = (int(min_levels), int(max_levels))
+        self.conjunctions = (int(min_conjunctions), int(max_conjunctions))
+        assert 2*int(max_levels)*int(max_conjunctions) <= len(propositions), "The domain does not have enough propositions!"
+
+    def sample(self):
+        # Sampling a conjuntion of *n_conjs* (not p[0]) Until (p[1]) formulas of *n_levels* levels
+        n_conjs = random.randint(*self.conjunctions)
+        p = random.sample(self.propositions,2*self.levels[1]*n_conjs)
+        ltl = None
+        seqs = []
+        b = 0
+        for i in range(n_conjs):
+            n_levels = random.randint(*self.levels)
+            # Sampling an until task of *n_levels* levels
+            until_task = ('until',('not',p[b]),p[b+1])
+            seq = [(p[b], p[b+1])]
+            b +=2
+            for j in range(1,n_levels):
+                until_task = ('until',('not',p[b]),('and', p[b+1], until_task))
+                seq = [(p[b], p[b+1])] + seq
+                b +=2
+            # Adding the until task to the conjunction of formulas that the agent have to solve
+            if ltl is None: ltl = until_task
+            else:           ltl = ('and',until_task,ltl)
+            seqs = [tuple(seq)] + seqs
+        seqs = tuple(seqs)
+        def delta(s, c):
+            if s is not None:
+                if s != () and c != s[0][0] and c == s[0][1]:
+                    return s[1:]
+                elif s != () and c == s[0][0]:
+                    return None
+            return s
+        dfas = tuple(DFA(start=seq, inputs=self.propositions, label=lambda s: s == tuple(), transition=delta) for seq in seqs)
+        return tuple((dfa,) for dfa in dfas)
+
+    # def sample(self):
+    #     conjs = random.randint(*self.conjunctions)
+    #     seqs = tuple(self.sample_sequence() for _ in range(conjs))
+    #     dfas = tuple(DFA(start=seq, inputs=self.propositions, label=lambda s: s == tuple(), transition=lambda s, c: s[1:] if s != () and c != s[0][0] and c == s[0][1] else s) for seq in seqs)
+    #     return tuple((dfa,) for dfa in dfas)
 
 
 # This class generates random LTL formulas that form a sequence of actions.
@@ -219,6 +282,8 @@ def getDFASampler(sampler_id, propositions):
         return SequenceSampler(propositions, tokens[1], tokens[2])
     elif (tokens[0] == "Until"):
         return UntilTaskSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
+    elif (tokens[0] == "CompositionalUntil"):
+        return CompositionalUntilTaskSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "SuperSampler"):
         return SuperSampler(propositions)
     elif (tokens[0] == "Adversarial"):
