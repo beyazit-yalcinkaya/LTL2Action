@@ -31,11 +31,15 @@ def average_reward_per_step(returns, num_frames):
     return numpy.mean(avgs)
 
 
-def average_discounted_return(returns, num_frames, disc):
+def average_discounted_return(returns, num_frames, disc, include_error=False):
     discounted_returns = []
     assert(len(returns) == len(num_frames))
 
     for i in range(len(returns)):
         discounted_returns.append(returns[i] * (disc ** (num_frames[i]-1)))
 
-    return numpy.mean(discounted_returns)
+    if include_error:
+        return numpy.mean(discounted_returns), numpy.std(discounted_returns)
+    else:
+        return numpy.mean(discounted_returns)
+
