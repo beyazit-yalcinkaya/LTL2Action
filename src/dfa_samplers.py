@@ -266,6 +266,86 @@ class AdversarialEnvSampler(DFASampler):
                 transition=delta,
             ),),)
 
+class ParitySampler(DFASampler):
+    def __init__(self, propositions, min_levels=1, max_levels=2, min_conjunctions=1 , max_conjunctions=2):
+        super().__init__(propositions)
+        self.levels       = (int(min_levels), int(max_levels))
+        self.conjunctions = (int(min_conjunctions), int(max_conjunctions))
+        assert 3*int(max_levels)*int(max_conjunctions) <= len(propositions), "The domain does not have enough propositions!"
+
+    def sample(self):
+        # Sampling a conjuntion of *n_conjs* (not p[0]) Until (p[1]) formulas of *n_levels* levels
+        n_conjs = random.randint(*self.conjunctions)
+        p = random.sample(self.propositions,3*self.levels[1]*n_conjs)
+        ltl = None
+        seqs = []
+        b = 0
+        for i in range(n_conjs):
+            n_levels = random.randint(*self.levels)
+            seq = [(p[b], p[b + 1], p[b + 2])]
+            b += 3
+            for j in range(1, n_levels):
+                seq = [(p[b], p[b + 1], p[b + 2])] + seq
+                b += 3
+            seqs = [tuple(seq)] + seqs
+        seqs = tuple(seqs)
+        def delta(s, c):
+            s, is_in_recovery_mode = s
+            if is_in_recovery_mode:
+                for i in range(len(s)):
+                    if s[i] != () and c == s[i][0][2]: # Fix
+                        return s, False
+            else:
+                for i in range(len(s)):
+                    if s[i] != () and c == s[i][0][0]: # Reach
+                        return s[:i] + (s[i][1:],) + s[i + 1:], False
+                    elif s[i] != () and c == s[i][0][1]: # Avoid
+                        return s, True
+            return s, is_in_recovery_mode
+        return ((DFA(
+            start=(seqs, False),
+            inputs=self.propositions,
+            label=lambda s: s[0] == tuple(tuple() for _ in range(n_conjs)) and not s[1],
+            transition=delta,
+        ),),)
+
+class CompositionalParitySampler(DFASampler):
+    def __init__(self, propositions, min_levels=1, max_levels=2, min_conjunctions=1 , max_conjunctions=2):
+        super().__init__(propositions)
+        self.levels       = (int(min_levels), int(max_levels))
+        self.conjunctions = (int(min_conjunctions), int(max_conjunctions))
+        assert 3*int(max_levels)*int(max_conjunctions) <= len(propositions), "The domain does not have enough propositions!"
+
+    def sample(self):
+        # Sampling a conjuntion of *n_conjs* (not p[0]) Until (p[1]) formulas of *n_levels* levels
+        n_conjs = random.randint(*self.conjunctions)
+        p = random.sample(self.propositions,3*self.levels[1]*n_conjs)
+        ltl = None
+        seqs = []
+        b = 0
+        for i in range(n_conjs):
+            n_levels = random.randint(*self.levels)
+            seq = [(p[b], p[b + 1], p[b + 2])]
+            b += 3
+            for j in range(1, n_levels):
+                seq = [(p[b], p[b + 1], p[b + 2])] + seq
+                b += 3
+            seqs = [tuple(seq)] + seqs
+        seqs = tuple(seqs)
+        def delta(s, c):
+            is_in_recovery_mode, s = s
+            if is_in_recovery_mode:
+                if s != () and c == s[0][2]: # Fix
+                    return False, s
+            else:
+                if s != () and c == s[0][0]: # Reach
+                    return False, s[1:]
+                elif s != () and c == s[0][1]: # Avoid
+                    return True, s
+            return is_in_recovery_mode, s
+        dfas = tuple(DFA(start=(False, seq), inputs=self.propositions, label=lambda s: not s[0] and s[1] == tuple(), transition=delta) for seq in seqs)
+        return tuple((dfa,) for dfa in dfas)
+
 def getRegisteredSamplers(propositions):
     return [SequenceSampler(propositions),
             UntilTaskSampler(propositions),
@@ -289,6 +369,10 @@ def getDFASampler(sampler_id, propositions):
     elif ("_JOIN_" in sampler_id): # e.g., Eventually_1_5_1_4_JOIN_Until_1_3_1_2
         sampler_ids = sampler_id.split("_JOIN_")
         return JoinSampler(propositions, sampler_ids)
+    elif (tokens[0] == "Parity"):
+        return ParitySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
+    elif (tokens[0] == "CompositionalParity"):
+        return CompositionalParitySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "Sequence"):
         return SequenceSampler(propositions, tokens[1], tokens[2])
     elif (tokens[0] == "Until"):
