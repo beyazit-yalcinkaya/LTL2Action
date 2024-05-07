@@ -81,8 +81,8 @@ class RGCNRootShared(GNN):
 
     def forward(self, g):
         g = np.array(g).reshape((1, -1)).tolist()[0]
-        g = dgl.batch(g, node_attrs=["feat", "is_root"]) # TODO: Do we need node_attrs?
-        h_0 = self.linear_in(g.ndata["feat"].float().squeeze())
+        g = dgl.batch(g)
+        h_0 = self.linear_in(g.ndata["feat"].float().squeeze(dim=1))
         h = h_0
         etypes = g.edata["type"]
 
@@ -91,6 +91,7 @@ class RGCNRootShared(GNN):
             h = self.conv(g, torch.cat([h, h_0], dim=1), etypes)
         g.ndata['h'] = h
 
+        g.ndata["is_root"] = g.ndata["is_root"].float()
         hg = dgl.sum_nodes(g, 'h', weight='is_root')
         return self.g_embed(hg).squeeze(1)
 

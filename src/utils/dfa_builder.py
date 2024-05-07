@@ -2,6 +2,7 @@ import ring
 import numpy as np
 
 import dgl
+import torch
 import networkx as nx
 from copy import deepcopy
 from pysat.solvers import Solver
@@ -29,55 +30,71 @@ class DFABuilder(object):
     @ring.lru(maxsize=400000)
     def _to_graph(self, dfa_goal, library="dgl"):
         from utils.env import edge_types
-        cnf_nxgs = []
-        cnf_or_nodes = []
-        cnf_rename = []
+        nxg_goal = []
+        nxg_goal_or_nodes = []
+        rename_goal = []
         for i, dfa_clause in enumerate(dfa_goal):
-            clause_nxgs = []
-            clause_init_nodes = []
-            clause_rename = []
+            nxg_clause = []
+            nxg_init_nodes = []
+            rename_clause = []
             for j, dfa in enumerate(dfa_clause):
-                clause_nxg, clause_init_node = self.dfa_to_formatted_nxg(dfa)
-                clause_nxgs.append(clause_nxg)
-                clause_rename.append(str(j) + "_")
-                clause_init_nodes.append(str(j) + "_" + clause_init_node)
-            if len(clause_nxgs) > 1:
-                composed_clause_nxg = nx.union_all(clause_nxgs, rename=clause_rename)
-            elif len(clause_nxgs) == 1:
-                composed_clause_nxg = clause_nxgs[0]
-                nx.relabel_nodes(composed_clause_nxg, {node: str(j) + "_" + node for node in composed_clause_nxg.nodes}, copy=False)
-            else:
-                raise NotImplemented
-            or_node = "OR"
-            composed_clause_nxg.add_node(or_node, feat=np.array([[0.0] * self.feature_size]))
-            composed_clause_nxg.nodes[or_node]["feat"][0][feature_inds["OR"]] = 1.0
-            for clause_init_node in clause_init_nodes:
-                composed_clause_nxg.add_edge(clause_init_node, or_node, type=edge_types["OR"])
-            cnf_nxgs.append(composed_clause_nxg)
-            cnf_rename.append(str(i) + "_")
-            cnf_or_nodes.append(str(i) + "_" + or_node)
-        if len(cnf_nxgs) > 1:
-            composed_cnf_nxg = nx.union_all(cnf_nxgs, rename=cnf_rename)
-        elif len(cnf_nxgs) == 1:
-            composed_cnf_nxg = cnf_nxgs[0]
-            nx.relabel_nodes(composed_cnf_nxg, {node: str(i) + "_" + node for node in composed_cnf_nxg.nodes}, copy=False)
+                nxg, init_node = self.dfa_to_formatted_nxg(dfa)
+                nxg_clause.append(nxg)
+                rename_clause.append(str(j) + "_")
+                nxg_init_nodes.append(str(j) + "_" + init_node)
+
+            if nxg_clause != []:
+                composed_nxg_clause = nx.union_all(nxg_clause, rename=rename_clause)
+                or_node = "OR"
+                composed_nxg_clause.add_node(or_node, feat=np.array([[0.0] * self.feature_size]))
+                composed_nxg_clause.nodes[or_node]["feat"][0][feature_inds["OR"]] = 1.0
+                for nxg_init_node in nxg_init_nodes:
+                    composed_nxg_clause.add_edge(nxg_init_node, or_node, type=edge_types["OR"])
+                nxg_goal.append(composed_nxg_clause)
+                rename_goal.append(str(i) + "_")
+                nxg_goal_or_nodes.append(str(i) + "_" + or_node)
+
+        if nxg_goal != []:
+            composed_nxg_goal = nx.union_all(nxg_goal, rename=rename_goal)
         else:
-            raise NotImplemented
-        nx.set_node_attributes(composed_cnf_nxg, np.array([0.0], dtype=np.float32), "is_root")
+            composed_nxg_goal = nx.DiGraph()
+
         and_node = "AND"
-        composed_cnf_nxg.add_node(and_node, feat=np.array([[0.0] * self.feature_size]), is_root=np.array([1.0], dtype=np.float32))
-        composed_cnf_nxg.nodes[and_node]["feat"][0][feature_inds["AND"]] = 1.0
-        for cnf_or_node in cnf_or_nodes:
-            composed_cnf_nxg.add_edge(cnf_or_node, and_node, type=edge_types["AND"])
-        for node in composed_cnf_nxg.nodes:
-            composed_cnf_nxg.add_edge(node, node, type=edge_types["self"])
-        nxg = composed_cnf_nxg
+        composed_nxg_goal.add_node(and_node, feat=np.array([[0.0] * self.feature_size]))
+        nx.set_node_attributes(composed_nxg_goal, np.array([0.0]), "is_root")
+        composed_nxg_goal.nodes[and_node]["is_root"] = np.array([1.0])
+        composed_nxg_goal.nodes[and_node]["feat"][0][feature_inds["AND"]] = 1.0
 
-        if (library == "networkx"): return nxg
+        for or_node in nxg_goal_or_nodes:
+            composed_nxg_goal.add_edge(or_node, and_node, type=edge_types["AND"])
 
-        # convert the Networkx graph to dgl graph and pass the 'feat' attribute
-        g = dgl.DGLGraph()
-        g.from_networkx(nxg, node_attrs=["feat", "is_root"], edge_attrs=["type"]) # dgl does not support string attributes (i.e., token)
+        for node in composed_nxg_goal.nodes:
+            composed_nxg_goal.add_edge(node, node, type=edge_types["self"])
+
+        nxg = composed_nxg_goal
+
+        return self._get_dgl_graph(nxg)
+
+    def _get_dgl_graph(self, nxg):
+
+        edges = list(nxg.edges)
+        nodes = list(nxg.nodes)
+        edge_types_attributes = nx.get_edge_attributes(nxg, "type")
+
+        U, V, _type = zip(*[(nodes.index(edge[0]), nodes.index(edge[1]), edge_types_attributes[edge]) for edge in edges])
+        _feat, _is_root = zip(*[(nxg.nodes[node]["feat"], nxg.nodes[node]["is_root"]) for node in nodes])
+
+        U = torch.from_numpy(np.array(U))
+        V = torch.from_numpy(np.array(V))
+        _type = torch.from_numpy(np.array(_type))
+        _feat = torch.from_numpy(np.array(_feat))
+        _is_root = torch.from_numpy(np.array(_is_root))
+
+        g = dgl.graph((U, V))
+        g.ndata["feat"] = _feat
+        g.ndata["is_root"] = _is_root
+        g.edata["type"] = _type
+
         return g
 
     @ring.lru(maxsize=600000)

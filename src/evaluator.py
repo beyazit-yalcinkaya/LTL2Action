@@ -124,7 +124,7 @@ if __name__ == '__main__':
         idx = model_path.find("seed:") + 5
         seed = int(model_path[idx:idx+2].strip("_"))
 
-        eval = utils.Eval(args.env, model_path, args.ltl_sampler,
+        eval = Eval(args.env, model_path, args.ltl_sampler,
                      seed=seed, device=torch.device("cpu"), argmax=False,
                      num_procs=args.procs, ignoreLTL=args.ignoreLTL, progression_mode=args.progression_mode, gnn=args.gnn, recurrence=args.recurrence, dumb_ac=False, discount=args.discount, isDFAGoal=args.dfa)
         rpe, nfpe = eval.eval(-1, episodes=args.eval_episodes, stdout=True)
