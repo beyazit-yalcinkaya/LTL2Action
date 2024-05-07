@@ -7,7 +7,7 @@ given template(s).
 """
 
 import random
-from dfa import DFA
+from dfa import DFA, dict2dfa
 
 class DFASampler():
     def __init__(self, propositions):
@@ -346,6 +346,93 @@ class CompositionalParitySampler(DFASampler):
         dfas = tuple(DFA(start=(False, seq), inputs=self.propositions, label=lambda s: not s[0] and s[1] == tuple(), transition=delta) for seq in seqs)
         return tuple((dfa,) for dfa in dfas)
 
+class GeneralDFASampler(DFASampler):
+    def __init__(self, propositions):
+        super().__init__(propositions)
+        pass
+
+    def reach_avoid_sampler(self, max_size=6, prob_stutter=0.9):
+        n_tokens = len(self.propositions)
+        assert n_tokens > 1
+
+        n = random.randint(3, max_size)
+        success, fail = n - 2, n - 1
+
+        tokens = self.propositions
+        while True:
+            transitions = {
+              success: (True,  {t: success for t in tokens}),
+              fail:    (False, {t: fail    for t in tokens}),
+            }
+            for state in range(n - 2):
+                noop, good, bad = partition = (set(), set(), set())
+                random.shuffle(tokens)
+                good.add(tokens[0])
+                bad.add(tokens[1])
+                for token in tokens[2:]:
+                    if random.random() <= prob_stutter:
+                        noop.add(token)
+                    else:
+                        partition[random.randint(1, 2)].add(token)
+
+                _transitions = dict()
+                for token in good:
+                    _transitions[token] = state + 1
+                for token in bad:
+                    _transitions[token] = fail
+                for token in noop:
+                    _transitions[token] = state
+
+                transitions[state] = (False, _transitions)
+
+            yield dict2dfa(transitions, start=0).minimize()
+
+
+    def accepting_is_sink(self, d: DFA):
+        def transition(s, c):
+            if d._label(s) is True:
+                return s
+            return d._transition(s, c)
+        return DFA(start=d.start,
+                   inputs=d.inputs,
+                   label=d._label,
+                   transition=transition)
+
+
+    def dfa_sampler(self, max_mutations=5):
+        dfas = self.reach_avoid_sampler()
+        while True:
+            candidate = next(dfas)
+            for _ in range(random.randint(0, max_mutations)):
+                tmp =  self.accepting_is_sink(self.change_transition(candidate))
+                if tmp is None: continue
+                tmp = tmp.minimize()
+                if len(tmp.states()) == 1: continue
+                candidate = tmp.minimize()
+            yield candidate
+
+    def sample(self):
+        sampler = self.dfa_sampler(max_mutations=5)
+        return ((next(sampler),),)
+
+    def change_transition(self, orig: DFA, rng=random):
+        if (len(orig.inputs) <= 1) or (len(orig.states()) <= 1):
+            return None
+
+        state1 = rng.choice(list(orig.states()))
+        state2 = rng.choice(list(orig.states()))
+        sym = rng.choice(list(orig.inputs))
+
+        def transition(s, c):
+            if (s, c) == (state1, sym):
+                return state2
+            return orig._transition(s, c)
+
+        return DFA(
+            label=orig._label, transition=transition,
+            start=orig.start, inputs=orig.inputs, outputs=orig.outputs,
+        )
+
 def getRegisteredSamplers(propositions):
     return [SequenceSampler(propositions),
             UntilTaskSampler(propositions),
@@ -387,6 +474,8 @@ def getDFASampler(sampler_id, propositions):
         return EventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "CompositionalEventually"):
         return CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
+    elif (tokens[0] == "GeneralDFA"):
+        return GeneralDFASampler(propositions)
     else: # "Default"
         return DefaultSampler(propositions)
 
