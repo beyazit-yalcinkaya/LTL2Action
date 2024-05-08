@@ -413,7 +413,9 @@ class GeneralDFASampler(DFASampler):
 
     def sample(self):
         sampler = self.dfa_sampler(max_mutations=5)
-        return ((next(sampler),),)
+        sample = next(sampler)
+        assert sample.find_word() is not None
+        return ((sample,),)
 
     def change_transition(self, orig: DFA, rng=random):
         if (len(orig.inputs) <= 1) or (len(orig.states()) <= 1):

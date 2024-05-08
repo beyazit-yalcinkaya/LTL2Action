@@ -72,7 +72,7 @@ class DFAEnv(gym.Wrapper):
         # progressing the DFA formula
         truth_assignment = self.get_events(self.obs, action, next_obs)
 
-        self.dfa_goal = self.progression(self.dfa_goal, truth_assignment)
+        self.dfa_goal = self._advance(self.dfa_goal, truth_assignment)
         self.obs      = next_obs
 
         dfa_reward, dfa_done = self.get_dfa_goal_reward_and_done(self.dfa_goal)
@@ -126,15 +126,8 @@ class DFAEnv(gym.Wrapper):
 
         return dfa_reward
 
-    def progression(self, dfa_cnf_goal, truth_assignment, start=None):
-        return tuple(self.dfa_clause_progression(dfa_clause, truth_assignment, start) for dfa_clause in dfa_cnf_goal)
-
-    def dfa_clause_progression(self, dfa_clause, truth_assignment, start=None):
-        return tuple(self.dfa_progression(dfa, truth_assignment, start) for dfa in dfa_clause)
-
-    def dfa_progression(self, dfa, truth_assignment, start=None):
-        import attr
-        return attr.evolve(dfa, start=dfa.transition(truth_assignment, start=start))
+    def _advance(self, dfa_goal, truth_assignment):
+        return tuple(tuple(dfa.advance(truth_assignment).minimize() for dfa in dfa_clause) for dfa_clause in dfa_goal)
 
     # # X is a vector where index i is 1 if prop i progresses the formula, -1 if it falsifies it, 0 otherwise.
     def progress_info(self, dfas):
