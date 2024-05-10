@@ -13,8 +13,7 @@ class SimpleLTLEnv(gym.Env):
                 - (int) maximum lenght of the episode
         """
         self.letters      = letters
-        self.letter_types = list(set(letters))
-        self.letter_types.sort()
+        self.letter_types = tuple(sorted(list(set(letters))))
         self.action_space = spaces.Discrete(len(self.letter_types))
         self.observation_space = spaces.Discrete(1)
         self.num_episodes = 0
