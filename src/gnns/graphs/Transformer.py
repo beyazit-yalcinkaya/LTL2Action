@@ -17,7 +17,7 @@ class TranformerEncoder(nn.Module):
         self.pos_enc_size = pos_enc_size
         self.pre = nn.Linear(input_dim, hidden_dim)
         self.pre_pos = nn.Linear(self.pos_enc_size, hidden_dim)
-        self.transformer = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=n_heads)
+        self.transformer = nn.TransformerEncoderLayer(d_model=hidden_dim, nhead=n_heads, dim_feedforward=512)
         self.post = nn.Linear(hidden_dim, output_dim)
 
         self.depth = depth
