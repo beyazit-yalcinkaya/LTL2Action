@@ -26,7 +26,11 @@ from policy_network import PolicyNetwork
 # Function from https://github.com/ikostrikov/pytorch-a2c-ppo-acktr/blob/master/model.py
 def init_params(m):
     classname = m.__class__.__name__
-    if classname.find("Linear") != -1:
+    if classname.find("TypedLinear") != -1:
+        weight = m.get_weight()
+        weight.data.normal_(0, 1)
+        weight.data *= 1 / torch.sqrt(weight.data.pow(2).sum(1, keepdim=True))
+    elif classname.find("Linear") != -1:
         m.weight.data.normal_(0, 1)
         m.weight.data *= 1 / torch.sqrt(m.weight.data.pow(2).sum(1, keepdim=True))
         if m.bias is not None:
@@ -40,7 +44,8 @@ class ACModel(nn.Module, torch_ac.ACModel):
         # Decide which components are enabled
         self.use_progression_info = "progress_info" in obs_space
         self.use_text = not ignoreLTL and (gnn_type == "GRU" or gnn_type == "LSTM") and "text" in obs_space
-        self.use_ast = not ignoreLTL and ("GCN" in gnn_type) and "text" in obs_space
+        self.use_ast = not ignoreLTL and ("GCN" in gnn_type or "Transformer" in gnn_type or "GATv2Conv" in gnn_type) and "text" in obs_space
+
         self.gnn_type = gnn_type
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.action_space = action_space

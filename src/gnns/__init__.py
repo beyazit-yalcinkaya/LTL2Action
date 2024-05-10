@@ -31,4 +31,10 @@ register(id="RGCN_8x32_ROOT_SHARED", entry_point="gnns.graphs.RGCN.RGCNRootShare
 
 register(id="RGCN_16x32_ROOT_SHARED", entry_point="gnns.graphs.RGCN.RGCNRootShared", hidden_dim=32, num_layers=16)
 
+register(id="RGCN_16x64_ROOT_SHARED", entry_point="gnns.graphs.RGCN.RGCNRootShared", hidden_dim=64, num_layers=16)
+
 register(id="RGCN_8x64_ROOT_SHARED", entry_point="gnns.graphs.RGCN.RGCNRootShared", hidden_dim=64, num_layers=8)
+
+register(id="Transformer", entry_point="gnns.graphs.Transformer.TranformerEncoder", hidden_dim=32, depth=8, n_heads=2, pos_enc_size=2)
+
+register(id="GATv2Conv", entry_point="gnns.graphs.GATv2Conv.GATv2ConvEncoder", hidden_dim=32, n_heads=2)
