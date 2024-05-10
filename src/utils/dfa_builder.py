@@ -96,6 +96,9 @@ class DFABuilder(object):
         g.ndata["is_root"] = _is_root
         g.edata["type"] = _type
 
+        g.ndata["PE"] = dgl.lap_pe(g, k=2, padding=True)
+        # g.ndata["PE"] = dgl.random_walk_pe(g, k=2)
+
         return g
 
     def min_distance_to_accept_by_state_normalized(self, dfa, state):

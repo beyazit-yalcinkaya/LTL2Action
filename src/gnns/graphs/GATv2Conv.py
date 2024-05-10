@@ -14,19 +14,24 @@ class GATv2ConvEncoder(GNN):
         from utils.env import edge_types
 
         hidden_dim = kwargs.get('hidden_dim', 32)
+        num_layers = kwargs.get('num_layers', 8)
         n_heads = kwargs.get('n_heads', 2)
 
+        self.num_layers = num_layers
+
         self.linear_in = nn.Linear(input_dim, hidden_dim)
-        self.conv = GATv2Conv(hidden_dim, hidden_dim, n_heads)
+        self.conv = GATv2Conv(2*hidden_dim, hidden_dim, n_heads)
         self.g_embed = nn.Linear(2*hidden_dim, output_dim)
 
     def forward(self, g):
         g = np.array(g).reshape((1, -1)).tolist()[0]
         g = dgl.batch(g)
         h = self.linear_in(g.ndata["feat"].float().squeeze(dim=1))
-        h = self.conv(g, h)
-        n, m, k = h.shape
-        h = h.view(n, m*k)
+        h = torch.cat([h, h], dim=1)
+        for i in range(self.num_layers):
+            h = self.conv(g, h)
+            n, m, k = h.shape
+            h = h.view(n, m*k)
         g.ndata['h'] = h
         g.ndata["is_root"] = g.ndata["is_root"].float()
         hg = dgl.sum_nodes(g, 'h', weight='is_root')
