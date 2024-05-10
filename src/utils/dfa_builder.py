@@ -1,4 +1,5 @@
 import ring
+import random
 import numpy as np
 
 import dgl
@@ -7,7 +8,7 @@ import networkx as nx
 from copy import deepcopy
 from pysat.solvers import Solver
 
-feature_inds = {"rejecting": -1, "accepting": -2, "temp": -3, "normal": -4, "init": -5, "AND": -6, "OR": -7}
+feature_inds = {"rejecting": -1, "accepting": -2, "temp": -3, "normal": -4, "init": -5, "AND": -6, "OR": -7, "distance_normalized": -8}
 
 """
 A class that can take an DFA formula and generate the Abstract Syntax Tree (DFA) of it. This
@@ -97,6 +98,13 @@ class DFABuilder(object):
 
         return g
 
+    def min_distance_to_accept_by_state_normalized(self, dfa, state):
+        from dfa.utils import min_distance_to_accept_by_state
+        depths = min_distance_to_accept_by_state(dfa)
+        if state in depths:
+            return depths[state]/100.0
+        return 1.0
+
     @ring.lru(maxsize=600000)
     def dfa_to_formatted_nxg(self, dfa):
         from utils.env import edge_types
@@ -110,6 +118,8 @@ class DFABuilder(object):
             nxg.add_node(start)
             nxg.nodes[start]["feat"] = np.array([[0.0] * self.feature_size])
             nxg.nodes[start]["feat"][0][feature_inds["normal"]] = 1.0
+            # Assumption: We never do more than chain length 7-8 so deviding by 100 is safe.
+            nxg.nodes[start]["feat"][0][feature_inds["distance_normalized"]] = self.min_distance_to_accept_by_state_normalized(dfa, s)
             if dfa._label(s): # is accepting?
                 nxg.nodes[start]["feat"][0][feature_inds["accepting"]] = 1.0
             elif sum(s != dfa._transition(s, a) for a in dfa.inputs) == 0: # is rejecting?
