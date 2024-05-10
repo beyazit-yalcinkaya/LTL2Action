@@ -347,18 +347,19 @@ class CompositionalParitySampler(DFASampler):
         return tuple((dfa,) for dfa in dfas)
 
 class GeneralDFASampler(DFASampler):
-    def __init__(self, propositions):
+    def __init__(self, propositions, max_size=6):
         super().__init__(propositions)
-        pass
+        self.max_size = max_size
+        self.sampler = self.dfa_sampler()
 
-    def reach_avoid_sampler(self, max_size=6, prob_stutter=0.9):
+    def reach_avoid_sampler(self, prob_stutter=0.9):
         n_tokens = len(self.propositions)
         assert n_tokens > 1
 
-        n = random.randint(3, max_size)
+        n = random.randint(3, self.max_size)
         success, fail = n - 2, n - 1
 
-        tokens = self.propositions
+        tokens = list(self.propositions)
         while True:
             transitions = {
               success: (True,  {t: success for t in tokens}),
@@ -412,8 +413,7 @@ class GeneralDFASampler(DFASampler):
             yield candidate
 
     def sample(self):
-        sampler = self.dfa_sampler(max_mutations=5)
-        sample = next(sampler)
+        sample = next(self.sampler)
         assert sample.find_word() is not None
         return ((sample,),)
 
@@ -434,6 +434,20 @@ class GeneralDFASampler(DFASampler):
             label=orig._label, transition=transition,
             start=orig.start, inputs=orig.inputs, outputs=orig.outputs,
         )
+
+class CompositionalGeneralDFASampler(DFASampler):
+    def __init__(self, propositions, max_size=6, min_conjunctions=1 , max_conjunctions=2):
+        super().__init__(propositions)
+        self.max_size = int(max_size)
+        assert self.max_size > 2
+        self.min_conjunctions = int(min_conjunctions)
+        self.max_conjunctions = int(max_conjunctions)
+        self.sampler = GeneralDFASampler(self.propositions, self.max_size).sampler
+
+    def sample(self):
+        n_conjs = random.randint(self.min_conjunctions, self.max_conjunctions)
+        dfas = tuple(next(self.sampler) for _ in range(n_conjs))
+        return tuple((dfa,) for dfa in dfas)
 
 def getRegisteredSamplers(propositions):
     return [SequenceSampler(propositions),
@@ -478,6 +492,10 @@ def getDFASampler(sampler_id, propositions):
         return CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "GeneralDFA"):
         return GeneralDFASampler(propositions)
+    elif (tokens[0] == "SimpleGeneralDFA"):
+        return GeneralDFASampler(propositions, 3)
+    elif (tokens[0] == "CompositionalGeneralDFA"):
+        return CompositionalGeneralDFASampler(propositions, tokens[1], tokens[2], tokens[3])
     else: # "Default"
         return DefaultSampler(propositions)
 
