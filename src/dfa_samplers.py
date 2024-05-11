@@ -7,6 +7,7 @@ given template(s).
 """
 
 import random
+from functools import reduce
 from dfa import DFA, dict2dfa
 
 class DFASampler():
@@ -444,9 +445,15 @@ class CompositionalGeneralDFASampler(DFASampler):
         self.max_conjunctions = int(max_conjunctions)
         self.sampler = GeneralDFASampler(self.propositions, self.max_size).sampler
 
+    def reject(self, dfas):
+     lang = reduce(lambda x, y: (x & y).minimize(), dfas)
+     return len(lang.states()) == 1
+
     def sample(self):
         n_conjs = random.randint(self.min_conjunctions, self.max_conjunctions)
         dfas = tuple(next(self.sampler) for _ in range(n_conjs))
+        while self.reject(dfas):
+            dfas = tuple(next(self.sampler) for _ in range(n_conjs))
         return tuple((dfa,) for dfa in dfas)
 
 def getRegisteredSamplers(propositions):
