@@ -25,5 +25,6 @@ def make_env(env_key, progression_mode, sampler, seed=None, intrinsic=0, noLTL=F
         edge_types = {k:v for (v, k) in enumerate(["self", "arg", "arg1", "arg2"])}
         return ltl_wrappers.LTLEnv(env, progression_mode, sampler, intrinsic)
     else:
-        edge_types = {k:v for (v, k) in enumerate(["self", "normal-to-temp", "temp-to-normal", "AND", "OR"])}
+        edge_types = {k:v for (v, k) in enumerate(["self", "normal-to-temp", "temp-to-normal", "AND"])}
+        # edge_types = {k:v for (v, k) in enumerate(["self", "normal-to-temp", "temp-to-normal", "AND", "OR"])}
         return dfa_wrappers.DFAEnv(env, progression_mode, sampler, intrinsic)
