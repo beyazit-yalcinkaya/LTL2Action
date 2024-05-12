@@ -30,6 +30,7 @@ class TranformerEncoder(nn.Module):
         h = self.pre(h) + self.pre_pos(g.ndata["PE"])
         
         depth_hop_matrix = dgl.khop_adj(g, self.depth)
+        # depth_hop_matrix = dgl.khop_adj(g, self.depth).transpose(0, 1)
         depth_hop_matrix = depth_hop_matrix.masked_fill(depth_hop_matrix == 0, float("inf"))
 
         mask = 1 - depth_hop_matrix
