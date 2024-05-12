@@ -56,8 +56,7 @@ class ZonesEnv(Engine):
             })
 
         self.zones = zones
-        self.zone_types = list(set(zones))
-        self.zone_types.sort()
+        self.zone_types = tuple(sorted(list(set(zones))))
         self.use_fixed_map = use_fixed_map
         self._rgb = {
             zone.JetBlack: [0, 0, 0, 1],

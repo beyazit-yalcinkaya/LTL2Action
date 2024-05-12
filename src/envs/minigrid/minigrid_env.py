@@ -20,8 +20,7 @@ class MinigridEnv(gym.Env):
         """
         self.env = env
         self.letters = letters
-        self.letter_types = list(set(letters))
-        self.letter_types.sort()
+        self.letter_types = tuple(sorted(list(set(letters))))
         self.action_space = env.action_space
         self.observation_space = env.observation_space['image']
         self.num_episodes = 0
