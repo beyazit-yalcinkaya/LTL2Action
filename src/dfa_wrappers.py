@@ -21,6 +21,7 @@ from gym import spaces
 import random
 from dfa_samplers import getDFASampler
 from dfa.utils import min_distance_to_accept_by_state
+from functools import reduce
 
 class DFAEnv(gym.Wrapper):
     def __init__(self, env, progression_mode="full", dfa_sampler=None, intrinsic=0.0):
@@ -47,7 +48,7 @@ class DFAEnv(gym.Wrapper):
         self.observation_space = spaces.Dict({'features': env.observation_space})
         self.intrinsic = intrinsic
 
-        self.max_depth = 1_000
+        self.max_depth = 1_000_000
 
     def get_events(self, obs, act, next_obs):
         # This function must return the events that currently hold on the environment
@@ -79,7 +80,8 @@ class DFAEnv(gym.Wrapper):
         self.dfa_goal = self._advance(self.dfa_goal, truth_assignment)
         self.obs      = next_obs
 
-        dfa_reward, dfa_done = self.get_dfa_goal_reward_and_done(old_dfa_goal, self.dfa_goal)
+        dfa_reward, dfa_done = self.get_dfa_goal_reward_and_done(self.dfa_goal)
+        # dfa_reward, dfa_done = self.get_depth_reward(old_dfa_goal, self.dfa_goal)
 
         # Computing the new observation and returning the outcome of this action
         if self.progression_mode == "full":
@@ -101,23 +103,22 @@ class DFAEnv(gym.Wrapper):
 
         return dfa_obs, reward, done, info
 
-    def get_dfa_goal_reward_and_done(self, old_dfa_goal, dfa_goal):
+    def get_dfa_goal_reward_and_done(self, dfa_goal):
         dfa_clause_rewards = []
-        for old_dfa_clause, dfa_clause in zip(old_dfa_goal, dfa_goal):
-            dfa_clause_reward = self.get_dfa_clause_reward_and_done(old_dfa_clause, dfa_clause)
+        for dfa_clause in dfa_goal:
+            dfa_clause_reward = self.get_dfa_clause_reward_and_done(dfa_clause)
             dfa_clause_rewards.append(dfa_clause_reward)
         reward = min(dfa_clause_rewards)
         return reward, reward == 1 or reward == -1
 
-    def get_dfa_clause_reward_and_done(self, old_dfa_clause, dfa_clause):
+    def get_dfa_clause_reward_and_done(self, dfa_clause):
         dfa_rewards = []
-        for old_dfa, dfa in zip(old_dfa_clause, dfa_clause):
-            dfa_reward = self.get_dfa_reward(old_dfa, dfa)
-            # dfa_reward = self.get_depth_reward(old_dfa, dfa)
+        for dfa in dfa_clause:
+            dfa_reward = self.get_dfa_reward(dfa)
             dfa_rewards.append(dfa_reward)
         return max(dfa_rewards)
 
-    def get_dfa_reward(self, old_dfa, dfa):
+    def get_dfa_reward(self, dfa):
         current_state = dfa.start
         current_state_label = dfa._label(current_state)
         states = dfa.states()
@@ -138,21 +139,27 @@ class DFAEnv(gym.Wrapper):
             return depths[state]
         return self.max_depth
 
-    def get_depth_reward(self, old_dfa, dfa):
+    def _to_monolithic_dfa(self, dfa_goal):
+        return reduce(lambda x, y: x & y, map(lambda dfa_clause: reduce(lambda x, y: x | y, dfa_clause), dfa_goal)).minimize()
+
+    def get_depth_reward(self, old_dfa_goal, dfa_goal):
+        old_dfa = self._to_monolithic_dfa(old_dfa_goal)
+        dfa = self._to_monolithic_dfa(dfa_goal)
+
         if dfa._label(dfa.start):
-            return 1.0
+            return 1.0, True
         old_depth = self.min_distance_to_accept_by_state(old_dfa, old_dfa.start)
         depth = self.min_distance_to_accept_by_state(dfa, dfa.start)
         if depth == self.max_depth:
-            return -1.0
+            return -1.0, True
         depth_reward = (old_depth - depth)/self.max_depth
         if depth_reward < 0:
-            depth_reward *= 100
+            depth_reward *= 1_000
         if depth_reward > 1:
-            return 1
+            return 1, True
         elif depth_reward < -1:
-            return -1
-        return depth_reward
+            return -1, True
+        return depth_reward, False
 
     def _advance(self, dfa_goal, truth_assignment):
         return tuple(tuple(dfa.advance(truth_assignment).minimize() for dfa in dfa_clause) for dfa_clause in dfa_goal)
