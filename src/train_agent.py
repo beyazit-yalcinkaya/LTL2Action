@@ -119,6 +119,7 @@ parser.add_argument("--freeze-ltl", action="store_true", default=False,help="Fre
 
 # DFA
 parser.add_argument("--dfa", action="store_true", default=False, help="Use DFA instead of LTL (default: False)")
+parser.add_argument("--pretrained-gnn-sampler", default=None, help="Pretrained gnn sampler")
 
 args = parser.parse_args()
 
@@ -149,8 +150,8 @@ model_dir = utils.get_model_dir(model_name, storage_dir)
 pretrained_model_dir = None
 
 if args.pretrained_gnn:
-    assert(args.progression_mode == "full")
-    default_dir = f"symbol-storage/{args.gnn}-dumb_ac_{args.ltl_sampler}_Simple-LTL-Env-v0_seed:{args.seed}_*_prog:{args.progression_mode}_dfa:{args.dfa}/train"
+    assert args.progression_mode == "full" and args.pretrained_gnn_sampler is not None
+    default_dir = f"symbol-storage/{args.gnn}-dumb_ac_{args.pretrained_gnn_sampler}_Simple-LTL-Env-v0_seed:{args.seed}_*_prog:{args.progression_mode}_dfa:{args.dfa}/train"
     print(default_dir)
     model_dirs = glob.glob(default_dir)
     if len(model_dirs) == 0:
