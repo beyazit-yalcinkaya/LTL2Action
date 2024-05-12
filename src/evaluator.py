@@ -111,6 +111,7 @@ if __name__ == '__main__':
     parser.add_argument("--recurrence", type=int, default=1,
                     help="number of time-steps gradient is backpropagated (default: 1). If > 1, a LSTM is added to the model to have memory.")
     parser.add_argument("--gnn", default="RGCN_8x32_ROOT_SHARED", help="use gnn to model the LTL (only if ignoreLTL==True)")
+    parser.add_argument("--dumb-ac", action="store_true", default=False,help="Use a single-layer actor-critic")
 
     parser.add_argument("--dfa", action="store_true", default=False, help="Use DFA instead of LTL (default: False)")
 
@@ -126,7 +127,7 @@ if __name__ == '__main__':
 
         eval = Eval(args.env, model_path, args.ltl_sampler,
                      seed=seed, device=torch.device("cpu"), argmax=False,
-                     num_procs=args.procs, ignoreLTL=args.ignoreLTL, progression_mode=args.progression_mode, gnn=args.gnn, recurrence=args.recurrence, dumb_ac=False, discount=args.discount, isDFAGoal=args.dfa)
+                     num_procs=args.procs, ignoreLTL=args.ignoreLTL, progression_mode=args.progression_mode, gnn=args.gnn, recurrence=args.recurrence, dumb_ac=args.dumb_ac, discount=args.discount, isDFAGoal=args.dfa)
         rpe, nfpe = eval.eval(-1, episodes=args.eval_episodes, stdout=True)
         logs_returns_per_episode += rpe
         logs_num_frames_per_episode += nfpe 
