@@ -81,7 +81,7 @@ class DFAEnv(gym.Wrapper):
         self.dfa_goal = self._advance(self.dfa_goal, truth_assignment)
         self.obs      = next_obs
 
-        dfa_reward, dfa_done = self.get_dfa_goal_reward_and_done(self.dfa_goal)
+        dfa_reward, dfa_done = self.get_dfa_reward(self.dfa_goal)
         # dfa_reward, dfa_done = self.get_depth_reward(old_dfa_goal, self.dfa_goal)
 
         # Computing the new observation and returning the outcome of this action
@@ -104,41 +104,16 @@ class DFAEnv(gym.Wrapper):
 
         return dfa_obs, reward, done, info
 
-    def get_dfa_goal_reward_and_done(self, dfa_goal):
-        if self.get_mono_reject(dfa_goal):
+    def _to_monolithic_dfa(self, dfa_goal):
+        return reduce(OP.and_, map(lambda dfa_clause: reduce(OP.or_, dfa_clause), dfa_goal))
+
+    def get_dfa_reward(self, dfa_goal):
+        mono_dfa = self._to_monolithic_dfa(dfa_goal)
+        if mono_dfa.find_word() is None:
             return -1.0, True
-        dfa_clause_rewards = []
-        for dfa_clause in dfa_goal:
-            dfa_clause_reward = self.get_dfa_clause_reward_and_done(dfa_clause)
-            dfa_clause_rewards.append(dfa_clause_reward)
-        reward = min(dfa_clause_rewards)
-        return reward, reward == 1 or reward == -1
-
-    def get_mono_reject(self, dfa_goal):
-        mono = reduce(OP.and_, map(lambda dfa_clause: reduce(OP.or_, dfa_clause), dfa_goal))
-        return mono.find_word() is None
-
-    def get_dfa_clause_reward_and_done(self, dfa_clause):
-        dfa_rewards = []
-        for dfa in dfa_clause:
-            dfa_reward = self.get_dfa_reward(dfa)
-            dfa_rewards.append(dfa_reward)
-        return max(dfa_rewards)
-
-    def get_dfa_reward(self, dfa):
-        current_state = dfa.start
-        current_state_label = dfa._label(current_state)
-        states = dfa.states()
-        is_current_state_sink = sum(current_state != dfa._transition(current_state, a) for a in dfa.inputs) == 0
-
-        if current_state_label == True: # If starting state of dfa is accepting, then dfa_reward is 1.0.
-            dfa_reward = 1.0
-        elif is_current_state_sink: # If starting state of dfa is rejecting and current state is a sink, then dfa_reward is reject_reward.
-            dfa_reward = -1.0
-        else:
-            dfa_reward = 0.0 # If starting state of dfa is rejecting and self.dfa_goal has a multiple states, then dfa_reward is 0.0.
-
-        return dfa_reward
+        if mono_dfa._label(mono_dfa.start):
+            return 1.0, True
+        return 0.0, False
 
     def min_distance_to_accept_by_state(self, dfa, state):
         depths = min_distance_to_accept_by_state(dfa)
@@ -146,12 +121,9 @@ class DFAEnv(gym.Wrapper):
             return depths[state]
         return self.max_depth
 
-    def _to_monolithic_dfa(self, dfa_goal):
-        return reduce(lambda x, y: x & y, map(lambda dfa_clause: reduce(lambda x, y: x | y, dfa_clause), dfa_goal)).minimize()
-
     def get_depth_reward(self, old_dfa_goal, dfa_goal):
-        old_dfa = self._to_monolithic_dfa(old_dfa_goal)
-        dfa = self._to_monolithic_dfa(dfa_goal)
+        old_dfa = self._to_monolithic_dfa(old_dfa_goal).minimize()
+        dfa = self._to_monolithic_dfa(dfa_goal).minimize()
 
         if dfa._label(dfa.start):
             return 1.0, True
@@ -178,7 +150,7 @@ class DFAEnv(gym.Wrapper):
         for dfa in dfas:
             for i in range(len(propositions)):
                 progress_i = self.dfa_progression(dfa, propositions[i])
-                dfa_reward = self.get_dfa_reward(progress_i)
+                dfa_reward, _ = self.get_dfa_reward(progress_i)
                 X[i] = dfa_reward
         return X
 
