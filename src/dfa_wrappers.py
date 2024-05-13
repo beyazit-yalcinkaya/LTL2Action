@@ -22,6 +22,7 @@ import random
 from dfa_samplers import getDFASampler
 from dfa.utils import min_distance_to_accept_by_state
 from functools import reduce
+import operator as OP
 
 class DFAEnv(gym.Wrapper):
     def __init__(self, env, progression_mode="full", dfa_sampler=None, intrinsic=0.0):
@@ -104,12 +105,18 @@ class DFAEnv(gym.Wrapper):
         return dfa_obs, reward, done, info
 
     def get_dfa_goal_reward_and_done(self, dfa_goal):
+        if self.get_mono_reject(dfa_goal):
+            return -1.0, True
         dfa_clause_rewards = []
         for dfa_clause in dfa_goal:
             dfa_clause_reward = self.get_dfa_clause_reward_and_done(dfa_clause)
             dfa_clause_rewards.append(dfa_clause_reward)
         reward = min(dfa_clause_rewards)
         return reward, reward == 1 or reward == -1
+
+    def get_mono_reject(self, dfa_goal):
+        mono = reduce(OP.and_, map(lambda dfa_clause: reduce(OP.or_, dfa_clause), dfa_goal))
+        return mono.find_word() is None
 
     def get_dfa_clause_reward_and_done(self, dfa_clause):
         dfa_rewards = []
