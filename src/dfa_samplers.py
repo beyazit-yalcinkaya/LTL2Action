@@ -7,6 +7,7 @@ given template(s).
 """
 
 import random
+import numpy as np
 from functools import reduce
 from dfa import DFA, dict2dfa
 
@@ -428,16 +429,20 @@ class CompositionalParitySampler(DFASampler):
         return tuple((dfa,) for dfa in dfas)
 
 class GeneralDFASampler(DFASampler):
-    def __init__(self, propositions, max_size=6):
+    def __init__(self, propositions):
         super().__init__(propositions)
-        self.max_size = max_size
         self.sampler = self.dfa_sampler()
+        self.p = 0.5
+        self.max_size = 8 # + 2 = 10 states in total
+        self.n_values = np.array(list(range(1, self.max_size + 1)))
+        self.n_p = np.array([(self.p)**v for v in self.n_values])
+        self.n_p = self.n_p / np.sum(self.n_p)
 
     def reach_avoid_sampler(self, prob_stutter=0.9):
         n_tokens = len(self.propositions)
         assert n_tokens > 1
 
-        n = random.randint(3, self.max_size)
+        n = 2 + np.random.choice(self.n_values, p=self.n_p)
         success, fail = n - 2, n - 1
 
         tokens = list(self.propositions)
@@ -517,24 +522,23 @@ class GeneralDFASampler(DFASampler):
         )
 
 class CompositionalGeneralDFASampler(DFASampler):
-    def __init__(self, propositions, max_size=6, min_conjunctions=1, max_conjunctions=2, min_disjunctions=1, max_disjunctions=1):
+    def __init__(self, propositions):
         super().__init__(propositions)
-        self.max_size = int(max_size)
-        assert self.max_size > 2
-        self.min_conjunctions = int(min_conjunctions)
-        self.max_conjunctions = int(max_conjunctions)
-        self.min_disjunctions = int(min_disjunctions)
-        self.max_disjunctions = int(max_disjunctions)
-        self.sampler = GeneralDFASampler(self.propositions, self.max_size).sampler
+        self.sampler = GeneralDFASampler(self.propositions).sampler
+        self.p = 0.5
+        self.max_conjs = 5
+        self.n_conjs_values = np.array(list(range(1, self.max_conjs + 1)))
+        self.n_conjs_p = np.array([(self.p)**v for v in self.n_conjs_values])
+        self.n_conjs_p = self.n_conjs_p / np.sum(self.n_conjs_p)
 
     def reject(self, dfas):
-     lang = reduce(lambda x, y: (x & y).minimize(), dfas)
-     return len(lang.states()) == 1
+        # lang = reduce(lambda x, y: (x & y).minimize(), dfas)
+        # return len(lang.states()) == 1
+        mono = reduce(lambda x, y: (x & y), dfas)
+        return mono.find_word() is None
 
     def sample(self):
-        if self.max_disjunctions > 1:
-            raise NotImplementedError
-        n_conjs = random.randint(self.min_conjunctions, self.max_conjunctions)
+        n_conjs = np.random.choice(self.n_conjs_values, p=self.n_conjs_p)
         dfas = tuple(next(self.sampler) for _ in range(n_conjs))
         while self.reject(dfas):
             dfas = tuple(next(self.sampler) for _ in range(n_conjs))
@@ -591,11 +595,8 @@ def getDFASampler(sampler_id, propositions):
         return CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "GeneralDFA"):
         return GeneralDFASampler(propositions)
-    elif (tokens[0] == "SimpleGeneralDFA"):
-        return GeneralDFASampler(propositions, 3)
     elif (tokens[0] == "CompositionalGeneralDFA"):
-        return CompositionalGeneralDFASampler(propositions, tokens[1], tokens[2], tokens[3])
-        # return CompositionalGeneralDFASampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4], tokens[5])
+        return CompositionalGeneralDFASampler(propositions)
     else: # "Default"
         return DefaultSampler(propositions)
 
