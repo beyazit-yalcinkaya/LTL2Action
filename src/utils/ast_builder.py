@@ -18,12 +18,12 @@ class ASTBuilder(object):
 
         self.props = propositions
 
-        terminals = ['True', 'False'] + self.props
+        terminals = ['True', 'False'] + [prop for prop in self.props]
         ## Pad terminals with dummy propositions to get a fixed encoding size
         for i in range(15 - len(terminals)):
             terminals.append("dummy_"+str(i))
 
-        self._enc = OneHotEncoder(handle_unknown='ignore', dtype=np.int)
+        self._enc = OneHotEncoder(handle_unknown='ignore', dtype=np.int32)
         self._enc.fit([['next'], ['until'], ['and'], ['or'], ['eventually'],
             ['always'], ['not']] + np.array(terminals).reshape((-1, 1)).tolist())
 
@@ -34,13 +34,15 @@ class ASTBuilder(object):
     @ring.lru(maxsize=30000)
     def __call__(self, formula, library="dgl"):
         nxg = self._to_graph(formula)
-        nx.set_node_attributes(nxg, 0., "is_root")
-        nxg.nodes[0]["is_root"] = 1.
+        nx.set_node_attributes(nxg, np.array([0.0]), "is_root")
+        nxg.nodes[0]["is_root"] = np.array([1.0])
         if (library == "networkx"): return nxg
 
         # convert the Networkx graph to dgl graph and pass the 'feat' attribute
-        g = dgl.DGLGraph()
-        g.from_networkx(nxg, node_attrs=["feat", "is_root"], edge_attrs=["type"]) # dgl does not support string attributes (i.e., token)
+        # g = dgl.DGLGraph()
+        # g.from_networkx(nxg, node_attrs=["feat", "is_root"], edge_attrs=["type"]) # dgl does not support string attributes (i.e., token)
+        # return g
+        g = dgl.from_networkx(nxg, node_attrs=["feat", "is_root"], edge_attrs=["type"]) # dgl does not support string attributes (i.e., token)
         return g
 
     def _one_hot(self, token):
