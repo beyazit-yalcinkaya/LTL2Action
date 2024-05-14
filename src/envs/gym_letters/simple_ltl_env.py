@@ -62,4 +62,5 @@ class SimpleLTLEnvDefault(SimpleLTLEnv):
 
 class SimpleLTLZonesEnvDefault(SimpleLTLEnv):
     def __init__(self):
-        super().__init__(letters=[zone.JetBlack, zone.JetBlack, zone.Red, zone.Red, zone.White, zone.White,  zone.Yellow, zone.Yellow], timeout=1000)
+        zones = [zone.JetBlack, zone.JetBlack, zone.Red, zone.Red, zone.White, zone.White,  zone.Yellow, zone.Yellow]
+        super().__init__(letters=[str(i) for i in zones], timeout=1000)
