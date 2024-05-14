@@ -2,6 +2,7 @@ import random, math, os
 import numpy as np
 import gym
 from gym import spaces
+from envs.safety.zones_env import zone
 
 class SimpleLTLEnv(gym.Env):
 
@@ -58,3 +59,7 @@ class SimpleLTLEnv(gym.Env):
 class SimpleLTLEnvDefault(SimpleLTLEnv):
     def __init__(self):
         super().__init__(letters="abcdefghijkl", timeout=75)
+
+class SimpleLTLZonesEnvDefault(SimpleLTLEnv):
+    def __init__(self):
+        super().__init__(letters=[zone.JetBlack, zone.JetBlack, zone.Red, zone.Red, zone.White, zone.White,  zone.Yellow, zone.Yellow], timeout=1000)

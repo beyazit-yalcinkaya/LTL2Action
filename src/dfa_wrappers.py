@@ -141,7 +141,7 @@ class DFAEnv(gym.Wrapper):
         return depth_reward, False
 
     def _advance(self, dfa_goal, truth_assignment):
-        return tuple(tuple(dfa.advance(truth_assignment).minimize() for dfa in dfa_clause) for dfa_clause in dfa_goal)
+        return tuple(tuple(dfa.advance([truth_assignment]).minimize() for dfa in dfa_clause) for dfa_clause in dfa_goal)
 
     # # X is a vector where index i is 1 if prop i progresses the formula, -1 if it falsifies it, 0 otherwise.
     def progress_info(self, dfas):

@@ -13,6 +13,10 @@ register(
     id='Simple-LTL-Env-v0',
     entry_point='envs.gym_letters.simple_ltl_env:SimpleLTLEnvDefault'
 )
+register(
+    id='Simple-LTL-Zones-Env-v0',
+    entry_point='envs.gym_letters.simple_ltl_env:SimpleLTLZonesEnvDefault'
+)
 
 ### Letter Envs
 register(
