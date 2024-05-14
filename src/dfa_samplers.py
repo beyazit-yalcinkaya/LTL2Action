@@ -18,7 +18,7 @@ class DFASampler():
 
     def sample(self):
         candidate = self._sample()
-        while self.reject():
+        while self.reject(candidate):
             candidate = self._sample()
         return candidate
 
