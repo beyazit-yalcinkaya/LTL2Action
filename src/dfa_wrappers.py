@@ -51,11 +51,6 @@ class DFAEnv(gym.Wrapper):
 
         self.max_depth = 1_000_000
 
-    def get_events(self, obs, act, next_obs):
-        # This function must return the events that currently hold on the environment
-        # NOTE: The events are represented by a string containing the propositions with positive values only (e.g., "ac" means that only propositions 'a' and 'b' hold)
-        raise NotImplementedError
-
     def reset(self):
         self.obs = self.env.reset()
 
