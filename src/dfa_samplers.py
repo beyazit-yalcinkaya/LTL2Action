@@ -531,6 +531,7 @@ class BroadcastNegation(DFASampler):
         dfa_goal = self.dfa_sampler.sample()
         return self._negate(dfa_goal)
 
+    @classmethod
     def _negate(self, dfa_goal):
         return tuple(tuple((~dfa).minimize() for dfa in dfa_clause) for dfa_clause in dfa_goal)
 
@@ -543,6 +544,7 @@ class RandomBroadcastNegation(DFASampler):
         dfa_goal = self.dfa_sampler.sample()
         return self._negate(dfa_goal)
 
+    @classmethod
     def _negate(self, dfa_goal):
         broadcast_negated_dfa_goal = []
         is_first = True
