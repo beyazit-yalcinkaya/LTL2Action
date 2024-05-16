@@ -527,10 +527,33 @@ class BroadcastNegation(DFASampler):
         super().__init__(dfa_sampler.propositions)
         self.dfa_sampler = dfa_sampler
 
-    def sample(self):
+    def _sample(self):
         dfa_goal = self.dfa_sampler.sample()
         broadcast_negated_dfa_goal = tuple(tuple((~dfa).minimize() for dfa in dfa_clause) for dfa_clause in dfa_goal)
-        assert not self.reject(broadcast_negated_dfa_goal)
+        return broadcast_negated_dfa_goal
+
+class RandomBroadcastNegation(DFASampler):
+    def __init__(self, dfa_sampler):
+        super().__init__(dfa_sampler.propositions)
+        self.dfa_sampler = dfa_sampler
+
+    def _sample(self):
+        dfa_goal = self.dfa_sampler.sample()
+        broadcast_negated_dfa_goal = []
+        is_first = True
+        for dfa_clause in dfa_goal:
+            broadcast_negated_dfa_clause = []
+            for dfa in dfa_clause:
+                if is_first:
+                    broadcast_negated_dfa_clause.append(dfa)
+                    is_first = False
+                else:
+                    if random.random() < 0.5:
+                        broadcast_negated_dfa_clause.append((~dfa).minimize())
+                    else:
+                        broadcast_negated_dfa_clause.append(dfa)
+            broadcast_negated_dfa_goal.append(tuple(broadcast_negated_dfa_clause))
+        broadcast_negated_dfa_goal = tuple(broadcast_negated_dfa_goal)
         return broadcast_negated_dfa_goal
 
 def getRegisteredSamplers(propositions):
@@ -555,6 +578,8 @@ def getDFASampler(sampler_id, propositions):
         return CompositionalReachAvoidSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "BN-CompositionalReachAvoid"):
         return BroadcastNegation(CompositionalReachAvoidSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "RBN-CompositionalReachAvoid"):
+        return RandomBroadcastNegation(CompositionalReachAvoidSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "ReachAvoidFix"):
         return ReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "N-ReachAvoidFix"):
@@ -563,6 +588,8 @@ def getDFASampler(sampler_id, propositions):
         return CompositionalReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "BN-CompositionalReachAvoidFix"):
         return BroadcastNegation(CompositionalReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "RBN-CompositionalReachAvoidFix"):
+        return RandomBroadcastNegation(CompositionalReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "Parity"):
         return ParitySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "N-Parity"):
@@ -571,6 +598,8 @@ def getDFASampler(sampler_id, propositions):
         return CompositionalParitySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "BN-CompositionalParity"):
         return BroadcastNegation(CompositionalParitySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "RBN-CompositionalParity"):
+        return RandomBroadcastNegation(CompositionalParitySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "Until"):
         return UntilTaskSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "N-Until"):
@@ -579,6 +608,8 @@ def getDFASampler(sampler_id, propositions):
         return CompositionalUntilTaskSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "BN-CompositionalUntil"):
         return BroadcastNegation(CompositionalUntilTaskSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "RBN-CompositionalUntil"):
+        return RandomBroadcastNegation(CompositionalUntilTaskSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "Adversarial"):
         return AdversarialEnvSampler(propositions)
     elif (tokens[0] == "N-Adversarial"):
@@ -589,8 +620,10 @@ def getDFASampler(sampler_id, propositions):
         return BroadcastNegation(EventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "CompositionalEventually"):
         return CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
-    elif (tokens[0] == "N-CompositionalEventually"):
+    elif (tokens[0] == "BN-CompositionalEventually"):
         return BroadcastNegation(CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "RBN-CompositionalEventually"):
+        return RandomBroadcastNegation(CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "GeneralDFA"):
         return GeneralDFASampler(propositions)
     elif (tokens[0] == "N-GeneralDFA"):
@@ -599,6 +632,8 @@ def getDFASampler(sampler_id, propositions):
         return CompositionalGeneralDFASampler(propositions)
     elif (tokens[0] == "BN-CompositionalGeneralDFA"):
         return BroadcastNegation(CompositionalGeneralDFASampler(propositions))
+    elif (tokens[0] == "RBN-CompositionalGeneralDFA"):
+        return RandomBroadcastNegation(CompositionalGeneralDFASampler(propositions))
     else:
         raise NotImplementedError
 
