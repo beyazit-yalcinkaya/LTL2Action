@@ -529,8 +529,10 @@ class BroadcastNegation(DFASampler):
 
     def _sample(self):
         dfa_goal = self.dfa_sampler.sample()
-        broadcast_negated_dfa_goal = tuple(tuple((~dfa).minimize() for dfa in dfa_clause) for dfa_clause in dfa_goal)
-        return broadcast_negated_dfa_goal
+        return self._negate(dfa_goal)
+
+    def _negate(self, dfa_goal):
+        return tuple(tuple((~dfa).minimize() for dfa in dfa_clause) for dfa_clause in dfa_goal)
 
 class RandomBroadcastNegation(DFASampler):
     def __init__(self, dfa_sampler):
@@ -539,6 +541,9 @@ class RandomBroadcastNegation(DFASampler):
 
     def _sample(self):
         dfa_goal = self.dfa_sampler.sample()
+        return self._negate(dfa_goal)
+
+    def _negate(self, dfa_goal):
         broadcast_negated_dfa_goal = []
         is_first = True
         for dfa_clause in dfa_goal:
@@ -555,6 +560,7 @@ class RandomBroadcastNegation(DFASampler):
             broadcast_negated_dfa_goal.append(tuple(broadcast_negated_dfa_clause))
         broadcast_negated_dfa_goal = tuple(broadcast_negated_dfa_goal)
         return broadcast_negated_dfa_goal
+
 
 def getRegisteredSamplers(propositions):
     raise NotImplementedError
