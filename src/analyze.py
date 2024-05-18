@@ -104,17 +104,18 @@ propositions = "abcdefghijkl"
 dfa_builder = utils.DFABuilder(propositions)
 gnn = get_gnn(gnn_type, pretrained_model_dir)
 
-sampler_names = ["ReachAvoidDerived", "ReachAvoid", "Reach", "ReachAvoidRedemption", "Parity"]
+sampler_names = ["Reach-Avoid Derived", "Reach-Avoid", "Reach", "Reach-Avoid with Redemption", "Parity"]
 
 x = []
 x_hue = []
 x_style = []
 # x_size = []
 for sampler_name in sampler_names:
-    if sampler_name == "ReachAvoidDerived":
+    if sampler_name == "Reach-Avoid Derived" and plot_type == "scatter":
         old_n = n
         n *= 4
-    sampler = getDFASampler("Compositional" + sampler_name + "_2_2_4_4", propositions)
+    sampler_id = sampler_name.replace(" ", "").replace("-", "").replace("with", "")
+    sampler = getDFASampler("Compositional" + sampler_id + "_2_2_4_4", propositions)
     samples = [sampler.sample() for _ in range(n)]
     two_collapsed_samples = [collapse_conjunctions(dfa_goal, k=2) for dfa_goal in samples]
     one_step_advance_samples = [advance_dfas(dfa_goal, k=1) for dfa_goal in samples]
@@ -134,7 +135,7 @@ for sampler_name in sampler_names:
         x_style.extend(["1-Step Advance Leading Accept" if is_accepting(one_step_advance_samples[i]) else "1-Step Advance" for i in range(n)])
 
     print(sampler_name, "is done")
-    if sampler_name == "ReachAvoidDerived":
+    if sampler_name == "Reach-Avoid Derived" and plot_type == "scatter":
         n = old_n
 
 x = np.array(x)
@@ -157,8 +158,8 @@ if plot_type == "scatter":
         plt.tight_layout()
         plt.savefig("figs/" + gnn_type + "_" + plot_type + "_" + str(n) + "_" +  method + "_" + exp_id + ".pdf", bbox_inches='tight')
 elif plot_type == "clustermap":
-    colors = [palette[0]]*n*4
-    for i in range(1, len(sampler_names)):
+    colors = []
+    for i in range(len(sampler_names)):
         colors.extend([palette[i]]*n)
 
     colors = np.array(colors)
