@@ -208,6 +208,65 @@ class AdversarialEnvSampler(DFASampler):
                 transition=delta,
             ),),)
 
+class ReachSampler(DFASampler):
+    def __init__(self, propositions, min_levels=1, max_levels=2, min_conjunctions=1 , max_conjunctions=2):
+        super().__init__(propositions)
+        self.levels       = (int(min_levels), int(max_levels))
+        self.conjunctions = (int(min_conjunctions), int(max_conjunctions))
+
+    def _sample(self):
+        # Sampling a conjuntion of *n_conjs* (not p[0]) Until (p[1]) formulas of *n_levels* levels
+        n_conjs = random.randint(*self.conjunctions)
+        seqs = []
+        p = self.propositions
+        for i in range(n_conjs):
+            n_levels = random.randint(*self.levels)
+            seq = []
+            for j in range(n_levels):
+                random.shuffle(p)
+                seq.append((p[0],))
+            seqs.append(tuple(seq))
+        seqs = tuple(seqs)
+        def delta(s, c):
+            if s is not None:
+                for i in range(len(s)):
+                    if s[i] != () and c == s[i][0][0]:
+                        return s[:i] + (s[i][1:],) + s[i + 1:]
+            return s
+        return ((DFA(
+            start=seqs,
+            inputs=self.propositions,
+            label=lambda s: s == tuple(tuple() for _ in range(n_conjs)),
+            transition=delta,
+        ).minimize(),),)
+
+class CompositionalReachSampler(DFASampler):
+    def __init__(self, propositions, min_levels=1, max_levels=2, min_conjunctions=1 , max_conjunctions=2):
+        super().__init__(propositions)
+        self.levels       = (int(min_levels), int(max_levels))
+        self.conjunctions = (int(min_conjunctions), int(max_conjunctions))
+
+    def _sample(self):
+        # Sampling a conjuntion of *n_conjs* (not p[0]) Until (p[1]) formulas of *n_levels* levels
+        n_conjs = random.randint(*self.conjunctions)
+        seqs = []
+        p = self.propositions
+        for i in range(n_conjs):
+            n_levels = random.randint(*self.levels)
+            seq = []
+            for j in range(n_levels):
+                random.shuffle(p)
+                seq.append((p[0],))
+            seqs.append(tuple(seq))
+        seqs = tuple(seqs)
+        def delta(s, c):
+            if s is not None:
+                if s != () and c == s[0][0]:
+                    return s[1:]
+            return s
+        dfas = tuple(DFA(start=seq, inputs=self.propositions, label=lambda s: s == tuple(), transition=delta).minimize() for seq in seqs)
+        return tuple((dfa,) for dfa in dfas)
+
 class ReachAvoidSampler(DFASampler):
     def __init__(self, propositions, min_levels=1, max_levels=2, min_conjunctions=1 , max_conjunctions=2):
         super().__init__(propositions)
@@ -271,7 +330,7 @@ class CompositionalReachAvoidSampler(DFASampler):
         dfas = tuple(DFA(start=seq, inputs=self.propositions, label=lambda s: s == tuple(), transition=delta).minimize() for seq in seqs)
         return tuple((dfa,) for dfa in dfas)
 
-class ReachAvoidFixSampler(DFASampler):
+class ReachAvoidRedemptionSampler(DFASampler):
     def __init__(self, propositions, min_levels=1, max_levels=2, min_conjunctions=1 , max_conjunctions=2):
         super().__init__(propositions)
         self.levels       = (int(min_levels), int(max_levels))
@@ -310,7 +369,7 @@ class ReachAvoidFixSampler(DFASampler):
             transition=delta,
         ).minimize(),),)
 
-class CompositionalReachAvoidFixSampler(DFASampler):
+class CompositionalReachAvoidRedemptionSampler(DFASampler):
     def __init__(self, propositions, min_levels=1, max_levels=2, min_conjunctions=1 , max_conjunctions=2):
         super().__init__(propositions)
         self.levels       = (int(min_levels), int(max_levels))
@@ -415,7 +474,7 @@ class CompositionalParitySampler(DFASampler):
         dfas = tuple(DFA(start=(False, seq), inputs=self.propositions, label=lambda s: not s[0] and s[1] == tuple(), transition=delta).minimize() for seq in seqs)
         return tuple((dfa,) for dfa in dfas)
 
-class GeneralDFASampler(DFASampler):
+class ReachAvoidDerivedSampler(DFASampler):
     def __init__(self, propositions):
         super().__init__(propositions)
         self.sampler = self.dfa_sampler()
@@ -507,10 +566,10 @@ class GeneralDFASampler(DFASampler):
             start=orig.start, inputs=orig.inputs, outputs=orig.outputs,
         )
 
-class CompositionalGeneralDFASampler(DFASampler):
+class CompositionalReachAvoidDerivedSampler(DFASampler):
     def __init__(self, propositions):
         super().__init__(propositions)
-        self.sampler = GeneralDFASampler(self.propositions).sampler
+        self.sampler = ReachAvoidDerivedSampler(self.propositions).sampler
         self.p = 0.5
         self.max_conjs = 5
         self.n_conjs_values = np.array(list(range(1, self.max_conjs + 1)))
@@ -588,16 +647,26 @@ def getDFASampler(sampler_id, propositions):
         return BroadcastNegation(CompositionalReachAvoidSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "RBN-CompositionalReachAvoid"):
         return RandomBroadcastNegation(CompositionalReachAvoidSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
-    elif (tokens[0] == "ReachAvoidFix"):
-        return ReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
-    elif (tokens[0] == "N-ReachAvoidFix"):
-        return BroadcastNegation(ReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
-    elif (tokens[0] == "CompositionalReachAvoidFix"):
-        return CompositionalReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
-    elif (tokens[0] == "BN-CompositionalReachAvoidFix"):
-        return BroadcastNegation(CompositionalReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
-    elif (tokens[0] == "RBN-CompositionalReachAvoidFix"):
-        return RandomBroadcastNegation(CompositionalReachAvoidFixSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "Reach"):
+        return ReachSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
+    elif (tokens[0] == "N-Reach"):
+        return BroadcastNegation(ReachSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "CompositionalReach"):
+        return CompositionalReachSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
+    elif (tokens[0] == "BN-CompositionalReach"):
+        return BroadcastNegation(CompositionalReachSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "RBN-CompositionalReach"):
+        return RandomBroadcastNegation(CompositionalReachSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "ReachAvoidRedemption"):
+        return ReachAvoidRedemptionSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
+    elif (tokens[0] == "N-ReachAvoidRedemption"):
+        return BroadcastNegation(ReachAvoidRedemptionSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "CompositionalReachAvoidRedemption"):
+        return CompositionalReachAvoidRedemptionSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
+    elif (tokens[0] == "BN-CompositionalReachAvoidRedemption"):
+        return BroadcastNegation(CompositionalReachAvoidRedemptionSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
+    elif (tokens[0] == "RBN-CompositionalReachAvoidRedemption"):
+        return RandomBroadcastNegation(CompositionalReachAvoidRedemptionSampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "Parity"):
         return ParitySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4])
     elif (tokens[0] == "N-Parity"):
@@ -632,16 +701,16 @@ def getDFASampler(sampler_id, propositions):
         return BroadcastNegation(CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "RBN-CompositionalEventually"):
         return RandomBroadcastNegation(CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
-    elif (tokens[0] == "GeneralDFA"):
-        return GeneralDFASampler(propositions)
-    elif (tokens[0] == "N-GeneralDFA"):
-        return BroadcastNegation(GeneralDFASampler(propositions))
-    elif (tokens[0] == "CompositionalGeneralDFA"):
-        return CompositionalGeneralDFASampler(propositions)
-    elif (tokens[0] == "BN-CompositionalGeneralDFA"):
-        return BroadcastNegation(CompositionalGeneralDFASampler(propositions))
-    elif (tokens[0] == "RBN-CompositionalGeneralDFA"):
-        return RandomBroadcastNegation(CompositionalGeneralDFASampler(propositions))
+    elif (tokens[0] == "ReachAvoidDerived"):
+        return ReachAvoidDerivedSampler(propositions)
+    elif (tokens[0] == "N-ReachAvoidDerived"):
+        return BroadcastNegation(ReachAvoidDerivedSampler(propositions))
+    elif (tokens[0] == "CompositionalReachAvoidDerived"):
+        return CompositionalReachAvoidDerivedSampler(propositions)
+    elif (tokens[0] == "BN-CompositionalReachAvoidDerived"):
+        return BroadcastNegation(CompositionalReachAvoidDerivedSampler(propositions))
+    elif (tokens[0] == "RBN-CompositionalReachAvoidDerived"):
+        return RandomBroadcastNegation(CompositionalReachAvoidDerivedSampler(propositions))
     else:
         raise NotImplementedError
 
