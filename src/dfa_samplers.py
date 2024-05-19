@@ -475,8 +475,9 @@ class CompositionalParitySampler(DFASampler):
         return tuple((dfa,) for dfa in dfas)
 
 class ReachAvoidDerivedSampler(DFASampler):
-    def __init__(self, propositions):
+    def __init__(self, propositions, truncate=True):
         super().__init__(propositions)
+        self.truncate = truncate
         self.sampler = self.dfa_sampler()
         self.p = 0.5
         self.max_size = 8 # + 2 = 10 states in total
@@ -488,7 +489,10 @@ class ReachAvoidDerivedSampler(DFASampler):
         n_tokens = len(self.propositions)
         assert n_tokens > 1
 
-        n = 2 + np.random.choice(self.n_values, p=self.n_p)
+        if self.truncate:
+            n = 2 + np.random.choice(self.n_values, p=self.n_p)
+        else:
+            n = 2 + np.random.geometric(p=self.p)
         success, fail = n - 2, n - 1
 
         tokens = list(self.propositions)
@@ -567,9 +571,10 @@ class ReachAvoidDerivedSampler(DFASampler):
         )
 
 class CompositionalReachAvoidDerivedSampler(DFASampler):
-    def __init__(self, propositions):
+    def __init__(self, propositions, truncate=True):
         super().__init__(propositions)
-        self.sampler = ReachAvoidDerivedSampler(self.propositions).sampler
+        self.truncate = truncate
+        self.sampler = ReachAvoidDerivedSampler(self.propositions, truncate=truncate).sampler
         self.p = 0.5
         self.max_conjs = 5
         self.n_conjs_values = np.array(list(range(1, self.max_conjs + 1)))
@@ -577,7 +582,10 @@ class CompositionalReachAvoidDerivedSampler(DFASampler):
         self.n_conjs_p = self.n_conjs_p / np.sum(self.n_conjs_p)
 
     def _sample(self):
-        n_conjs = np.random.choice(self.n_conjs_values, p=self.n_conjs_p)
+        if self.truncate:
+            n_conjs = np.random.choice(self.n_conjs_values, p=self.n_conjs_p)
+        else:
+            n_conjs = np.random.geometric(p=self.p)
         dfas = tuple(next(self.sampler) for _ in range(n_conjs))
         return tuple((dfa,) for dfa in dfas)
 
@@ -702,15 +710,25 @@ def getDFASampler(sampler_id, propositions):
     elif (tokens[0] == "RBN-CompositionalEventually"):
         return RandomBroadcastNegation(CompositionalEventuallySampler(propositions, tokens[1], tokens[2], tokens[3], tokens[4]))
     elif (tokens[0] == "ReachAvoidDerived"):
-        return ReachAvoidDerivedSampler(propositions)
+        return ReachAvoidDerivedSampler(propositions, truncate=True)
     elif (tokens[0] == "N-ReachAvoidDerived"):
-        return BroadcastNegation(ReachAvoidDerivedSampler(propositions))
+        return BroadcastNegation(ReachAvoidDerivedSampler(propositions, truncate=True))
     elif (tokens[0] == "CompositionalReachAvoidDerived"):
-        return CompositionalReachAvoidDerivedSampler(propositions)
+        return CompositionalReachAvoidDerivedSampler(propositions, truncate=True)
     elif (tokens[0] == "BN-CompositionalReachAvoidDerived"):
-        return BroadcastNegation(CompositionalReachAvoidDerivedSampler(propositions))
+        return BroadcastNegation(CompositionalReachAvoidDerivedSampler(propositions, truncate=True))
     elif (tokens[0] == "RBN-CompositionalReachAvoidDerived"):
-        return RandomBroadcastNegation(CompositionalReachAvoidDerivedSampler(propositions))
+        return RandomBroadcastNegation(CompositionalReachAvoidDerivedSampler(propositions, truncate=True))
+    elif (tokens[0] == "NT-ReachAvoidDerived"):
+        return ReachAvoidDerivedSampler(propositions, truncate=False)
+    elif (tokens[0] == "N-NT-ReachAvoidDerived"):
+        return BroadcastNegation(ReachAvoidDerivedSampler(propositions, truncate=False))
+    elif (tokens[0] == "NT-CompositionalReachAvoidDerived"):
+        return CompositionalReachAvoidDerivedSampler(propositions, truncate=False)
+    elif (tokens[0] == "BN-NT-CompositionalReachAvoidDerived"):
+        return BroadcastNegation(CompositionalReachAvoidDerivedSampler(propositions, truncate=False))
+    elif (tokens[0] == "RBN-NT-CompositionalReachAvoidDerived"):
+        return RandomBroadcastNegation(CompositionalReachAvoidDerivedSampler(propositions, truncate=False))
     else:
         raise NotImplementedError
 
